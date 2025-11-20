@@ -12,8 +12,8 @@ interface TimelineViewProps {
 }
 
 const TimelineView: React.FC<TimelineViewProps> = ({ articles, portfolioTickers, onAction, onClick }) => {
-  // Sort by date desc just in case
-  const sortedArticles = [...articles].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  // Use articles as passed (respecting the sort order from App)
+  const sortedArticles = articles;
 
   return (
     <div className="relative container mx-auto px-4 max-w-3xl">

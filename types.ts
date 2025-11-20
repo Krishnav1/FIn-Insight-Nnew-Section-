@@ -50,3 +50,5 @@ export interface ChatMessage {
   timestamp: number;
   isLoading?: boolean;
 }
+
+export type SortOption = 'newest' | 'oldest' | 'relevance';

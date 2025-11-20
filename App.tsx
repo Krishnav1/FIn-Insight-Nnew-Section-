@@ -3,7 +3,8 @@ import {
   Article, 
   LayoutMode, 
   ChatMessage, 
-  AITaskType 
+  AITaskType,
+  SortOption
 } from './types';
 import { USER_PORTFOLIO, TABS } from './constants';
 import { startChatSession, sendChatMessage, getInitialPrompt, fetchLiveNews } from './services/geminiService';
@@ -15,7 +16,13 @@ import TimelineView from './components/TimelineView';
 import Sidebar from './components/Sidebar';
 import OnboardingTour from './components/OnboardingTour';
 import ArticleDetailModal from './components/ArticleDetailModal';
-import { Search, Bell, Menu, TrendingUp, PieChart, Moon, Sun, RefreshCw, ShieldAlert } from 'lucide-react';
+import SortControls from './components/SortControls';
+import { Search, Bell, Menu, PieChart, Moon, Sun, RefreshCw, ShieldAlert } from 'lucide-react';
+
+// --- BRAND ASSETS ---
+// Assuming these files are available in the public root
+const FININSIGHT_LOGO_URL = "logo.jpg"; 
+const FINGENIE_AVATAR_URL = "fingenie.jpg";
 
 const App: React.FC = () => {
   // --- State ---
@@ -23,6 +30,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [loadingNews, setLoadingNews] = useState(true);
   const [articles, setArticles] = useState<Article[]>([]);
+  const [sortOption, setSortOption] = useState<SortOption>('relevance');
   
   // Dark Mode State
   const [darkMode, setDarkMode] = useState(false);
@@ -49,8 +57,18 @@ const App: React.FC = () => {
     } else if (activeTab === 'trending') {
       filtered = articles.filter(a => a.isTrending);
     }
-    return filtered;
-  }, [articles, activeTab, portfolioTickers]);
+
+    // Apply Sorting
+    return [...filtered].sort((a, b) => {
+      if (sortOption === 'newest') {
+        return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+      } else if (sortOption === 'oldest') {
+        return new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime();
+      }
+      // 'relevance' assumes the API return order (usually search relevance) is best
+      return 0;
+    });
+  }, [articles, activeTab, portfolioTickers, sortOption]);
 
   // Related Articles for Modal
   const relatedArticles = useMemo(() => {
@@ -89,6 +107,9 @@ const App: React.FC = () => {
             
             // Re-initialize the Gemini session with history so it knows context
             startChatSession(parsedArticle, USER_PORTFOLIO, parsedMessages);
+
+            // Open sidebar so user sees the restored chat
+            setSidebarOpen(true);
         } catch (e) {
             console.error("Failed to parse saved chat session", e);
             localStorage.removeItem('fingenie_selected_article');
@@ -111,6 +132,8 @@ const App: React.FC = () => {
       if (chatMessages.length > 0) {
           localStorage.setItem('fingenie_chat_messages', JSON.stringify(chatMessages));
       } else {
+          // If we explicitly cleared messages (but still have an article), we should update storage.
+          // Using selectedArticle check prevents clearing on initial render before hydration
           if (selectedArticle) {
               localStorage.removeItem('fingenie_chat_messages');
           }
@@ -119,7 +142,6 @@ const App: React.FC = () => {
 
   /**
    * Loads news data.
-   * @param silent If true, does not trigger the main loading skeleton. Used for background refresh.
    */
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoadingNews(true);
@@ -180,7 +202,7 @@ const App: React.FC = () => {
 
     if (!isSameArticle) {
         setSelectedArticle(article);
-        setChatMessages([]); 
+        setChatMessages([]); // Clear old chat
         startChatSession(article, USER_PORTFOLIO);
         
         const initialPrompt = getInitialPrompt(action as 'summary' | 'impact' | 'eli5');
@@ -238,8 +260,8 @@ const App: React.FC = () => {
   const TOUR_STEPS = [
       {
           targetId: '', 
-          title: 'Welcome to FinGenie! 👋',
-          content: 'Your AI-powered assistant for the Indian Stock Market. Let us show you how to get the most out of your news feed.'
+          title: 'Welcome to FinInsight! 👋',
+          content: 'Your professional market intelligence dashboard. Let us show you how to get the most out of your news feed.'
       },
       {
           targetId: 'tour-layout-toggle',
@@ -253,8 +275,8 @@ const App: React.FC = () => {
       },
       {
           targetId: 'tour-ai-actions', 
-          title: 'Instant AI Analysis ⚡',
-          content: 'Don’t just read—understand. Get one-click Summaries, Portfolio Impact analysis, or simple "Explain Like I’m 5" breakdowns.'
+          title: 'Ask FinGenie 🧞‍♂️',
+          content: 'Tap these buttons to summon your AI assistant. Get instant summaries, impact analysis, or simple explanations.'
       }
   ];
 
@@ -266,16 +288,17 @@ const App: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center gap-4">
+                {/* Mobile menu placeholder */}
                 <button className="lg:hidden p-2 -ml-2 text-gray-500 dark:text-gray-400">
                     <Menu size={24} />
                 </button>
-                <div className="flex items-center gap-2">
-                    <div className="bg-blue-600 text-white p-1.5 rounded">
-                        <TrendingUp size={20} />
-                    </div>
-                    <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-blue-500 dark:from-blue-400 dark:to-blue-200">
-                        FinGenie
-                    </span>
+                <div className="flex items-center gap-2 animate-fade-in">
+                   {/* BRAND LOGO REPLACEMENT */}
+                   <img 
+                     src={FININSIGHT_LOGO_URL} 
+                     alt="FinInsight" 
+                     className="h-10 w-auto object-contain" 
+                   />
                 </div>
             </div>
             
@@ -332,7 +355,10 @@ const App: React.FC = () => {
                 </p>
             </div>
             
-            <LayoutToggle mode={layoutMode} onChange={setLayoutMode} />
+            <div className="flex items-center gap-3">
+                <SortControls currentSort={sortOption} onSortChange={setSortOption} />
+                <LayoutToggle mode={layoutMode} onChange={setLayoutMode} />
+            </div>
         </div>
 
         {/* Tabs */}
@@ -403,13 +429,13 @@ const App: React.FC = () => {
             <div>
                 <p className="mb-1 font-medium text-gray-700 dark:text-gray-300">Disclaimer:</p>
                 <p>
-                    FinGenie utilizes artificial intelligence to aggregate news and generate insights. 
+                    FinInsight utilizes artificial intelligence (FinGenie) to aggregate news and generate insights. 
                     This content is for informational purposes only and does not constitute financial advice, endorsement, or recommendation. 
                     AI models can produce inaccurate or misleading information ("hallucinations"). 
                     Always verify market data with official sources before making investment decisions.
                 </p>
                 <p className="mt-2 opacity-70">
-                    Powered by Google Gemini. Search results provided by Google Search Grounding. © {new Date().getFullYear()} FinGenie.
+                    Powered by Google Gemini. Search results provided by Google Search Grounding. © {new Date().getFullYear()} FinInsight.
                 </p>
             </div>
           </div>
@@ -424,6 +450,7 @@ const App: React.FC = () => {
         selectedArticle={selectedArticle}
         messages={chatMessages}
         onSendMessage={sendMessage}
+        botAvatarUrl={FINGENIE_AVATAR_URL}
       />
 
       {/* Expanded Article Modal */}

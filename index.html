@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FinGenie News Hub</title>
+    <title>FinInsight – Market Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -18,11 +18,26 @@
               fadeIn: {
                 '0%': { opacity: '0', transform: 'translateY(10px)' },
                 '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-10px)' },
+              },
+              slideUp: {
+                '0%': { opacity: '0', transform: 'translateY(20px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              pulseGlow: {
+                '0%, 100%': { opacity: '1', boxShadow: '0 0 5px rgba(59, 130, 246, 0.5)' },
+                '50%': { opacity: '0.7', boxShadow: '0 0 15px rgba(59, 130, 246, 0.8)' },
               }
             },
             animation: {
               shimmer: 'shimmer 1.5s infinite',
               'fade-in': 'fadeIn 0.5s ease-out forwards',
+              float: 'float 3s ease-in-out infinite',
+              'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'pulse-glow': 'pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
             }
           }
         }
