@@ -1,4 +1,4 @@
-import { Article, PortfolioItem } from './types';
+import { Article, PortfolioItem, TickerSearchItem } from './types';
 
 export const USER_PORTFOLIO: PortfolioItem[] = [
   { symbol: 'RELIANCE', name: 'Reliance Industries', shares: 50, avgPrice: 2400 },
@@ -6,6 +6,28 @@ export const USER_PORTFOLIO: PortfolioItem[] = [
   { symbol: 'HDFCBANK', name: 'HDFC Bank', shares: 100, avgPrice: 1500 },
   { symbol: 'INFY', name: 'Infosys', shares: 45, avgPrice: 1450 },
   { symbol: 'TATAMOTORS', name: 'Tata Motors', shares: 200, avgPrice: 600 },
+];
+
+export const SEARCHABLE_TICKERS: TickerSearchItem[] = [
+  // Indices
+  { symbol: 'NIFTY 50', name: 'NSE Nifty 50 Index', type: 'Index' },
+  { symbol: 'SENSEX', name: 'BSE Sensex Index', type: 'Index' },
+  { symbol: 'BANKNIFTY', name: 'Nifty Bank Index', type: 'Index' },
+  // Portfolio (mapped dynamically usually, but hardcoded for this list source)
+  ...USER_PORTFOLIO.map(p => ({ symbol: p.symbol, name: p.name, type: 'Portfolio' as const })),
+  // Other Major Stocks
+  { symbol: 'ITC', name: 'ITC Limited', type: 'Stock' },
+  { symbol: 'SBIN', name: 'State Bank of India', type: 'Stock' },
+  { symbol: 'BAJFINANCE', name: 'Bajaj Finance', type: 'Stock' },
+  { symbol: 'BHARTIARTL', name: 'Bharti Airtel', type: 'Stock' },
+  { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank', type: 'Stock' },
+  { symbol: 'LT', name: 'Larsen & Toubro', type: 'Stock' },
+  { symbol: 'HINDUNILVR', name: 'Hindustan Unilever', type: 'Stock' },
+  { symbol: 'AXISBANK', name: 'Axis Bank', type: 'Stock' },
+  { symbol: 'ZOMATO', name: 'Zomato', type: 'Stock' },
+  { symbol: 'PAYTM', name: 'One97 Communications', type: 'Stock' },
+  { symbol: 'ADANIENT', name: 'Adani Enterprises', type: 'Stock' },
+  { symbol: 'ADANIPORTS', name: 'Adani Ports', type: 'Stock' },
 ];
 
 export const MOCK_ARTICLES: Article[] = [

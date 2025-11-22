@@ -1,27 +1,27 @@
+
 import React from 'react';
-import { Article } from '../types';
-import { Briefcase, Zap, BookOpen, Activity, Clock } from 'lucide-react';
+import { Article, AITaskType } from '../types';
+import { Zap, BookOpen, Activity, Scale } from 'lucide-react';
 import TickerText from './TickerText';
 import TickerPulse from './TickerPulse';
 
 interface TimelineViewProps {
   articles: Article[];
   portfolioTickers: string[];
-  onAction: (article: Article, action: 'summary' | 'impact' | 'eli5') => void;
+  watchlist: Set<string>;
+  onToggleWatchlist: (ticker: string) => void;
+  onAction: (article: Article, action: AITaskType) => void;
   onClick: (article: Article) => void;
 }
 
-const TimelineView: React.FC<TimelineViewProps> = ({ articles, portfolioTickers, onAction, onClick }) => {
-  // Use articles as passed (respecting the sort order from App)
-  const sortedArticles = articles;
-
+const TimelineView: React.FC<TimelineViewProps> = ({ articles, portfolioTickers, watchlist, onToggleWatchlist, onAction, onClick }) => {
   return (
     <div className="relative container mx-auto px-4 max-w-3xl">
         {/* Vertical Line */}
       <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700"></div>
 
       <div className="space-y-8 py-4">
-        {sortedArticles.map((article) => {
+        {articles.map((article) => {
             const isPortfolio = article.relatedTickers.some(t => portfolioTickers.includes(t));
             const date = new Date(article.publishedAt);
             const timeString = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -64,12 +64,17 @@ const TimelineView: React.FC<TimelineViewProps> = ({ articles, portfolioTickers,
                                 {article.relatedTickers && article.relatedTickers.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mt-3">
                                         {article.relatedTickers.map(ticker => (
-                                            <TickerPulse key={ticker} ticker={ticker} />
+                                            <TickerPulse 
+                                                key={ticker} 
+                                                ticker={ticker} 
+                                                isWatchlisted={watchlist.has(ticker)}
+                                                onToggleWatchlist={onToggleWatchlist}
+                                            />
                                         ))}
                                     </div>
                                 )}
                                 
-                                <div className="mt-3 flex gap-3">
+                                <div className="mt-3 flex gap-3 flex-wrap">
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); onAction(article, 'summary'); }}
                                         className="text-xs flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
@@ -82,6 +87,14 @@ const TimelineView: React.FC<TimelineViewProps> = ({ articles, portfolioTickers,
                                             className="text-xs flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline"
                                         >
                                             <Activity size={12} /> Impact
+                                        </button>
+                                    )}
+                                    {article.relatedTickers.length >= 2 && (
+                                         <button 
+                                            onClick={(e) => { e.stopPropagation(); onAction(article, 'compare'); }}
+                                            className="text-xs flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline"
+                                        >
+                                            <Scale size={12} /> Compare
                                         </button>
                                     )}
                                     <button 

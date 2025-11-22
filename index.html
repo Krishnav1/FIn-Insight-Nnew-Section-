@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FinInsight – Market Intelligence</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -30,6 +30,10 @@
               pulseGlow: {
                 '0%, 100%': { opacity: '1', boxShadow: '0 0 5px rgba(59, 130, 246, 0.5)' },
                 '50%': { opacity: '0.7', boxShadow: '0 0 15px rgba(59, 130, 246, 0.8)' },
+              },
+              marquee: {
+                '0%': { transform: 'translateX(0)' },
+                '100%': { transform: 'translateX(-50%)' },
               }
             },
             animation: {
@@ -38,6 +42,7 @@
               float: 'float 3s ease-in-out infinite',
               'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
               'pulse-glow': 'pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              marquee: 'marquee 40s linear infinite',
             }
           }
         }
@@ -54,6 +59,9 @@
           -ms-overflow-style: none;
           scrollbar-width: none;
       }
+      .hover\:pause:hover {
+        animation-play-state: paused;
+      }
     </style>
   <script type="importmap">
 {
@@ -63,7 +71,9 @@
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "react-markdown": "https://aistudiocdn.com/react-markdown@^10.1.0"
+    "react-markdown": "https://aistudiocdn.com/react-markdown@^10.1.0",
+    "remark-gfm": "https://aistudiocdn.com/remark-gfm@^4.0.0",
+    "recharts": "https://aistudiocdn.com/recharts@^2.12.0"
   }
 }
 </script>

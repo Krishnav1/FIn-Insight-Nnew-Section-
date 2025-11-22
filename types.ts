@@ -1,3 +1,4 @@
+
 export enum LayoutMode {
   GRID = 'GRID',
   LIST = 'LIST',
@@ -24,7 +25,15 @@ export interface Article {
   isTrending?: boolean;
 }
 
-export type AITaskType = 'summary' | 'impact' | 'eli5' | 'chat';
+export type AITaskType = 'summary' | 'impact' | 'eli5' | 'chat' | 'compare' | 'history' | 'bear-case' | 'jargon';
+
+export type DocumentType = 'annual_report' | 'concall' | 'quarterly_result' | 'red_flags';
+
+export interface TickerSearchItem {
+  symbol: string;
+  name: string;
+  type: 'Portfolio' | 'Stock' | 'Index';
+}
 
 export interface AIHistoryItem {
   id: string;
@@ -41,14 +50,72 @@ export interface GeminiResponse {
 
 export type Role = 'user' | 'model';
 
+export interface ChartDataset {
+  label: string;
+  data: number[];
+}
+
+export interface ChartData {
+  type: 'bar' | 'line' | 'area';
+  title: string;
+  labels: string[];
+  datasets: ChartDataset[];
+}
+
 export interface ChatMessage {
   id: string;
   role: Role;
   text: string;
   sentimentScore?: number; // -100 (Bearish) to 100 (Bullish)
   suggestions?: string[]; // Dynamic follow-up questions
+  chartData?: ChartData; // Optional JSON for dynamic charts (Recharts)
   timestamp: number;
   isLoading?: boolean;
+  liked?: boolean; // For user feedback
+  disliked?: boolean; // For user feedback
 }
 
 export type SortOption = 'newest' | 'oldest' | 'relevance';
+
+export interface AudioState {
+  isPlaying: boolean;
+  isLoading: boolean;
+  currentText: string | null;
+  audioBuffer: AudioBuffer | null;
+}
+
+export interface AnalysisResult {
+  title: string;
+  content: string;
+  sentiment?: number;
+}
+
+// New Interfaces for Portfolio Intelligence
+
+export interface PortfolioAttributionResult {
+  overallSentiment: 'Bullish' | 'Bearish' | 'Neutral';
+  movementPercentageEstimate: string; // e.g. "-1.2%"
+  culprits: Array<{ ticker: string; reason: string; impact: 'High' | 'Medium' | 'Low' }>;
+  saviors: Array<{ ticker: string; reason: string; impact: 'High' | 'Medium' | 'Low' }>;
+  hiddenFactor: string;
+  verdict: string;
+}
+
+export interface ConcentrationRiskResult {
+  riskLevel: 'High' | 'Medium' | 'Low';
+  primaryRiskFactor: string; // e.g. "Oil Sensitivity" or "IT Sector Overload"
+  risks: Array<{ factor: string; percentageExposure: string; explanation: string }>;
+  diversificationSuggestion: string;
+}
+
+export interface RippleEffectResult {
+  event: string;
+  impactFlow: Array<{ step: string; description: string }>; // Step 1 -> Step 2 -> Step 3
+  affectedTickers: Array<{ ticker: string; effect: 'Positive' | 'Negative'; reasoning: string }>;
+}
+
+export interface ForensicAnalysisResult {
+  redFlags: Array<{ flag: string; severity: 'Critical' | 'High' | 'Medium'; explanation: string }>;
+  manipulationScore: number; // 0 to 100 (100 = definite manipulation)
+  verdict: string;
+}

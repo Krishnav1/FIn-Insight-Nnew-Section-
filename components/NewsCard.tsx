@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Article, LayoutMode } from '../types';
-import { Briefcase, Zap, BookOpen, Activity, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+
+import React, { useState, useMemo } from 'react';
+import { Article, LayoutMode, AITaskType } from '../types';
+import { Briefcase, Zap, BookOpen, Activity, ExternalLink, ChevronDown, ChevronUp, Clock, Scale, Share2, History, AlertOctagon, FileQuestion } from 'lucide-react';
 import TickerText from './TickerText';
 import TickerPulse from './TickerPulse';
 
@@ -8,12 +9,36 @@ interface NewsCardProps {
   article: Article;
   layout: LayoutMode;
   isPortfolioRelevant: boolean;
-  onAction: (article: Article, action: 'summary' | 'impact' | 'eli5') => void;
+  watchlist: Set<string>;
+  onToggleWatchlist: (ticker: string) => void;
+  onAction: (article: Article, action: AITaskType) => void;
 }
 
-const NewsCard: React.FC<NewsCardProps> = ({ article, layout, isPortfolioRelevant, onAction }) => {
+const NewsCard: React.FC<NewsCardProps> = ({ article, layout, isPortfolioRelevant, watchlist, onToggleWatchlist, onAction }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const isList = layout === LayoutMode.LIST;
+
+  const readingTime = useMemo(() => {
+    const text = article.summary + " " + article.title;
+    const words = text.split(/\s+/).length;
+    return Math.max(1, Math.ceil(words / 200)); // Assumes summary is short, but scales if we had full content
+  }, [article]);
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareData = {
+      title: article.title,
+      text: `Check out this market impact on ${article.relatedTickers.join(', ')}: ${article.title} - via FinInsight`,
+      url: article.url || window.location.href,
+    };
+
+    if (navigator.share) {
+      navigator.share(shareData).catch(console.error);
+    } else {
+      navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
+      alert("Link copied to clipboard!");
+    }
+  };
 
   return (
     <div
@@ -41,13 +66,26 @@ const NewsCard: React.FC<NewsCardProps> = ({ article, layout, isPortfolioRelevan
             TRENDING
           </div>
         )}
+        <div className="absolute bottom-2 right-2 bg-black/50 backdrop-blur-sm text-white text-[10px] font-medium px-2 py-1 rounded-full flex items-center gap-1">
+            <Clock size={10} />
+            {readingTime} min read
+        </div>
       </div>
 
       {/* Content Section */}
       <div className="p-4 flex flex-col flex-grow relative z-0">
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-2">
           <span className="font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">{article.category}</span>
-          <span>{new Date(article.publishedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
+          <div className="flex items-center gap-3">
+             <span>{new Date(article.publishedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
+             <button 
+                onClick={handleShare}
+                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                title="Share"
+             >
+               <Share2 size={14} />
+             </button>
+          </div>
         </div>
         
         <h3 className={`text-lg font-semibold text-gray-900 dark:text-white leading-tight mb-2 group-hover/card:text-blue-600 dark:group-hover/card:text-blue-400 transition-colors ${isExpanded ? '' : 'line-clamp-2'}`}>
@@ -77,20 +115,24 @@ const NewsCard: React.FC<NewsCardProps> = ({ article, layout, isPortfolioRelevan
         {article.relatedTickers && article.relatedTickers.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4 pt-1">
             {article.relatedTickers.map(ticker => (
-              <TickerPulse key={ticker} ticker={ticker} />
+              <TickerPulse 
+                key={ticker} 
+                ticker={ticker} 
+                isWatchlisted={watchlist.has(ticker)}
+                onToggleWatchlist={onToggleWatchlist}
+              />
             ))}
           </div>
         )}
 
         <div className="mt-auto pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between gap-2">
-            <div className="tour-ai-actions flex gap-2">
+            <div className="tour-ai-actions flex gap-2 flex-wrap">
                  <button 
                     onClick={(e) => { e.stopPropagation(); onAction(article, 'summary'); }}
                     className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 bg-gray-50 dark:bg-gray-700 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2 py-1.5 rounded transition-colors"
                     title="AI Summary"
                 >
                     <Zap size={14} />
-                    <span className="hidden sm:inline">Summary</span>
                 </button>
                 {isPortfolioRelevant && (
                     <button 
@@ -102,24 +144,46 @@ const NewsCard: React.FC<NewsCardProps> = ({ article, layout, isPortfolioRelevan
                         <span className="hidden sm:inline">Impact</span>
                     </button>
                 )}
-                 <button 
-                    onClick={(e) => { e.stopPropagation(); onAction(article, 'eli5'); }}
-                    className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 bg-gray-50 dark:bg-gray-700 hover:bg-purple-50 dark:hover:bg-purple-900/30 px-2 py-1.5 rounded transition-colors"
-                    title="Explain Like I'm 5"
+                {article.relatedTickers.length >= 2 && (
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); onAction(article, 'compare'); }}
+                        className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 bg-gray-50 dark:bg-gray-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 px-2 py-1.5 rounded transition-colors"
+                        title="Compare Companies"
+                    >
+                        <Scale size={14} />
+                        <span className="hidden sm:inline">Compare</span>
+                    </button>
+                )}
+                
+                {/* Pro Features */}
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onAction(article, 'history'); }}
+                    className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-orange-600 dark:hover:text-orange-400 bg-gray-50 dark:bg-gray-700 hover:bg-orange-50 dark:hover:bg-orange-900/30 px-2 py-1.5 rounded transition-colors"
+                    title="History Repeats Analysis"
                 >
-                    <BookOpen size={14} />
-                    <span className="hidden sm:inline">ELI5</span>
+                    <History size={14} />
+                </button>
+
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onAction(article, 'bear-case'); }}
+                    className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-rose-600 dark:hover:text-rose-400 bg-gray-50 dark:bg-gray-700 hover:bg-rose-50 dark:hover:bg-rose-900/30 px-2 py-1.5 rounded transition-colors"
+                    title="Devil's Advocate / Bear Case"
+                >
+                    <AlertOctagon size={14} />
+                </button>
+                
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onAction(article, 'jargon'); }}
+                    className="flex items-center gap-1 text-xs font-medium text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 bg-gray-50 dark:bg-gray-700 hover:bg-purple-50 dark:hover:bg-purple-900/30 px-2 py-1.5 rounded transition-colors"
+                    title="Jargon Buster"
+                >
+                    <FileQuestion size={14} />
                 </button>
             </div>
             
-            {/* Toggle Icon / Source Link */}
-            <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 font-medium">
-                    {article.source}
-                </span>
-                <div className="text-gray-400 dark:text-gray-500">
-                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </div>
+            {/* Toggle Icon */}
+            <div className="text-gray-400 dark:text-gray-500">
+                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </div>
         </div>
       </div>
