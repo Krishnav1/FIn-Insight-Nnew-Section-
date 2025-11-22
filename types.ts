@@ -84,6 +84,39 @@ export interface DominoData {
   edges: DominoEdge[];
 }
 
+// Earnings Calendar Types
+export interface EarningsEvent {
+  ticker: string;
+  date: string; // ISO Date or "Tomorrow"
+  expectation: string; // "Bullish" | "Bearish" | "Neutral"
+  insight: string; // "Usually moves +/- 5%"
+}
+
+// New Interfaces for Portfolio Intelligence
+
+export interface PortfolioAttributionResult {
+  overallSentiment: 'Bullish' | 'Bearish' | 'Neutral';
+  movementPercentageEstimate: string; // e.g. "-1.2%"
+  culprits: Array<{ ticker: string; reason: string; impact: 'High' | 'Medium' | 'Low' }>;
+  saviors: Array<{ ticker: string; reason: string; impact: 'High' | 'Medium' | 'Low' }>;
+  hiddenFactor: string;
+  verdict: string;
+}
+
+export interface ConcentrationRiskResult {
+  riskLevel: 'High' | 'Medium' | 'Low';
+  primaryRiskFactor: string; // e.g. "Oil Sensitivity" or "IT Sector Overload"
+  risks: Array<{ factor: string; percentageExposure: string; explanation: string }>;
+  diversificationSuggestion: string;
+}
+
+export interface PortfolioHealthReport {
+  attribution: PortfolioAttributionResult;
+  risk: ConcentrationRiskResult;
+  earnings: EarningsEvent[];
+  timestamp: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: Role;
@@ -92,6 +125,7 @@ export interface ChatMessage {
   suggestions?: string[]; // Dynamic follow-up questions
   chartData?: ChartData; // Optional JSON for dynamic charts (Recharts)
   dominoData?: DominoData; // Optional JSON for Supply Chain Graph
+  portfolioReport?: PortfolioHealthReport; // Optional JSON for Portfolio Dashboard
   timestamp: number;
   isLoading?: boolean;
   liked?: boolean; // For user feedback
@@ -111,24 +145,6 @@ export interface AnalysisResult {
   title: string;
   content: string;
   sentiment?: number;
-}
-
-// New Interfaces for Portfolio Intelligence
-
-export interface PortfolioAttributionResult {
-  overallSentiment: 'Bullish' | 'Bearish' | 'Neutral';
-  movementPercentageEstimate: string; // e.g. "-1.2%"
-  culprits: Array<{ ticker: string; reason: string; impact: 'High' | 'Medium' | 'Low' }>;
-  saviors: Array<{ ticker: string; reason: string; impact: 'High' | 'Medium' | 'Low' }>;
-  hiddenFactor: string;
-  verdict: string;
-}
-
-export interface ConcentrationRiskResult {
-  riskLevel: 'High' | 'Medium' | 'Low';
-  primaryRiskFactor: string; // e.g. "Oil Sensitivity" or "IT Sector Overload"
-  risks: Array<{ factor: string; percentageExposure: string; explanation: string }>;
-  diversificationSuggestion: string;
 }
 
 export interface RippleEffectResult {
@@ -177,4 +193,23 @@ export interface EvidenceDocument {
   content: string; // The raw or simulated text of the document
   ticker: string;
   bingoData?: BingoData; // Optional gamified data for Earnings Calls
+}
+
+// Quick Peek & Living Ticker Types
+export interface StockQuote {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  peRatio: number;
+  marketCap: string;
+  sector: string;
+  week52High: number;
+  week52Low: number;
+}
+
+export interface QuickPeekData extends StockQuote {
+  chartData: number[]; // Array of prices for sparkline
+  sentiment: 'Bullish' | 'Bearish' | 'Neutral';
+  newsCount: number;
 }

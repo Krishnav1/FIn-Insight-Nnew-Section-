@@ -9,7 +9,7 @@ import {
   DocumentType
 } from './types';
 import { USER_PORTFOLIO, TABS } from './constants';
-import { startChatSession, sendChatMessage, getInitialPrompt, fetchLiveNews, analyzeDocument } from './services/geminiService';
+import { startChatSession, sendChatMessage, getInitialPrompt, fetchLiveNews, analyzeDocument, getPortfolioHealthReport } from './services/geminiService';
 
 // Components
 import LayoutToggle from './components/LayoutToggle';
@@ -20,11 +20,10 @@ import OnboardingTour from './components/OnboardingTour';
 import ArticleDetailModal from './components/ArticleDetailModal';
 import SortControls from './components/SortControls';
 import KeywordCloud from './components/KeywordCloud';
-import FinancialToolsModal from './components/FinancialToolsModal';
 import PortfolioAnalysisModal from './components/PortfolioAnalysisModal';
 import StockTicker from './components/StockTicker';
-import FinGeniePage from './components/FinGeniePage'; // New Component
-import { Search, Bell, Menu, PieChart, Moon, Sun, RefreshCw, ShieldAlert, Wrench, BrainCircuit, MessageSquare } from 'lucide-react';
+import FinGeniePage from './components/FinGeniePage'; 
+import { Search, Menu, PieChart, Moon, Sun, RefreshCw, ShieldAlert, BrainCircuit, MessageSquare } from 'lucide-react';
 
 // --- BRAND ASSETS ---
 const FININSIGHT_LOGO_URL = "logo.jpg"; 
@@ -56,7 +55,6 @@ const App: React.FC = () => {
 
   // Modals State
   const [viewArticle, setViewArticle] = useState<Article | null>(null);
-  const [toolsModalOpen, setToolsModalOpen] = useState(false);
   const [portfolioModalOpen, setPortfolioModalOpen] = useState(false);
 
   // Tour State
@@ -305,6 +303,30 @@ const App: React.FC = () => {
     setChatMessages(prev => [...prev, userMsg]);
     setAiLoading(true);
 
+    // Intercept /portfolio command logic for dashboard chat
+    if (text.toLowerCase().includes('/portfolio') || text.toLowerCase() === 'check portfolio health') {
+        try {
+            const fetchedNews = await fetchLiveNews();
+            const report = await getPortfolioHealthReport(USER_PORTFOLIO, fetchedNews || []);
+            
+            if (report) {
+                const botMsg: ChatMessage = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'model',
+                    text: "I've analyzed your portfolio health against today's news. Here is your Command Center report:",
+                    portfolioReport: report,
+                    timestamp: Date.now()
+                };
+                setChatMessages(prev => [...prev, botMsg]);
+                setAiLoading(false);
+                return;
+            }
+        } catch (e) {
+            console.error("Portfolio Command Failed", e);
+            // Fall through to normal chat if failed
+        }
+    }
+
     const result = await sendChatMessage(text);
 
     const aiMsg: ChatMessage = {
@@ -314,6 +336,7 @@ const App: React.FC = () => {
         sentimentScore: result.sentiment,
         suggestions: result.suggestions,
         chartData: result.chartData,
+        dominoData: result.dominoData,
         timestamp: Date.now()
     };
 
@@ -326,10 +349,10 @@ const App: React.FC = () => {
     setAiLoading(true);
 
     const intentMap: Record<DocumentType, string> = {
-        'annual_report': 'Annual Report',
-        'concall': 'Earnings Call',
+        'annual_report': 'Annual Report Analysis',
+        'concall': 'Earnings Call Analysis',
         'quarterly_result': 'Quarterly Results',
-        'red_flags': 'Red Flags',
+        'red_flags': 'Forensic Red Flags',
         'supply_chain': 'Supply Chain Map'
     };
     const userText = `Analyze the ${intentMap[docType]} for ${ticker}`;
@@ -343,7 +366,7 @@ const App: React.FC = () => {
     }]);
 
     try {
-        // Call specialized service which now returns chartData
+        // Call specialized service which now returns chartData and dominoData
         const { text, sentiment, chartData, dominoData } = await analyzeDocument(ticker, docType);
         
         // Add Bot Message
@@ -453,7 +476,7 @@ const App: React.FC = () => {
                     <span className="hidden sm:inline">Workspace</span>
                 </button>
                 
-                {/* NEW: Portfolio Brain Button (Only on Dashboard) */}
+                {/* Portfolio Brain Button (Only on Dashboard) */}
                 {!isChatMode && (
                     <button
                         onClick={() => setPortfolioModalOpen(true)}
@@ -463,14 +486,6 @@ const App: React.FC = () => {
                         <span className="hidden sm:inline">Portfolio Brain</span>
                     </button>
                 )}
-
-                <button
-                    onClick={() => setToolsModalOpen(true)}
-                    className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
-                >
-                    <Wrench size={16} />
-                    Tools
-                </button>
 
                 <button 
                   onClick={() => setDarkMode(!darkMode)} 
@@ -652,12 +667,6 @@ const App: React.FC = () => {
         onSelectRelated={setViewArticle}
       />
       
-      {/* Financial Tools Modal */}
-      <FinancialToolsModal 
-        isOpen={toolsModalOpen}
-        onClose={() => setToolsModalOpen(false)}
-      />
-
       {/* Portfolio Analysis Modal */}
       <PortfolioAnalysisModal 
         isOpen={portfolioModalOpen}
