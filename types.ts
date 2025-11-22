@@ -27,7 +27,7 @@ export interface Article {
 
 export type AITaskType = 'summary' | 'impact' | 'eli5' | 'chat' | 'compare' | 'history' | 'bear-case' | 'jargon';
 
-export type DocumentType = 'annual_report' | 'concall' | 'quarterly_result' | 'red_flags';
+export type DocumentType = 'annual_report' | 'concall' | 'quarterly_result' | 'red_flags' | 'supply_chain';
 
 export interface TickerSearchItem {
   symbol: string;
@@ -62,6 +62,28 @@ export interface ChartData {
   datasets: ChartDataset[];
 }
 
+// Domino Effect (Supply Chain) Types
+export interface DominoNode {
+  id: string;
+  name: string;
+  ticker?: string;
+  type: 'supplier' | 'target' | 'customer';
+  sentiment: 'positive' | 'negative' | 'neutral';
+  impactDetails: string; // e.g., "Steel prices up"
+}
+
+export interface DominoEdge {
+  source: string;
+  target: string;
+  label: string;
+  impact: 'positive' | 'negative' | 'neutral';
+}
+
+export interface DominoData {
+  nodes: DominoNode[];
+  edges: DominoEdge[];
+}
+
 export interface ChatMessage {
   id: string;
   role: Role;
@@ -69,6 +91,7 @@ export interface ChatMessage {
   sentimentScore?: number; // -100 (Bearish) to 100 (Bullish)
   suggestions?: string[]; // Dynamic follow-up questions
   chartData?: ChartData; // Optional JSON for dynamic charts (Recharts)
+  dominoData?: DominoData; // Optional JSON for Supply Chain Graph
   timestamp: number;
   isLoading?: boolean;
   liked?: boolean; // For user feedback
@@ -118,4 +141,40 @@ export interface ForensicAnalysisResult {
   redFlags: Array<{ flag: string; severity: 'Critical' | 'High' | 'Medium'; explanation: string }>;
   manipulationScore: number; // 0 to 100 (100 = definite manipulation)
   verdict: string;
+}
+
+// Research Canvas & Evidence
+export interface PinnedItem {
+  id: string;
+  type: 'chart' | 'text' | 'domino';
+  title: string;
+  content: any; // ChartData, string, or DominoData
+  timestamp: number;
+  notes?: string;
+}
+
+// Gamified Analysis Types
+export interface WordFrequency {
+  word: string;
+  count: number;
+  sentiment: 'positive' | 'negative' | 'neutral';
+}
+
+export interface SentimentTimePoint {
+  time: string; // e.g. "0-10 min"
+  sentiment: number; // -100 to 100
+  annotation?: string; // e.g. "CEO Opening Remarks"
+}
+
+export interface BingoData {
+  wordCloud: WordFrequency[];
+  sentimentTimeline: SentimentTimePoint[];
+}
+
+export interface EvidenceDocument {
+  title: string;
+  type: DocumentType;
+  content: string; // The raw or simulated text of the document
+  ticker: string;
+  bingoData?: BingoData; // Optional gamified data for Earnings Calls
 }

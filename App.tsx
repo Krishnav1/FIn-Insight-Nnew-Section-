@@ -329,7 +329,8 @@ const App: React.FC = () => {
         'annual_report': 'Annual Report',
         'concall': 'Earnings Call',
         'quarterly_result': 'Quarterly Results',
-        'red_flags': 'Red Flags'
+        'red_flags': 'Red Flags',
+        'supply_chain': 'Supply Chain Map'
     };
     const userText = `Analyze the ${intentMap[docType]} for ${ticker}`;
     
@@ -343,7 +344,7 @@ const App: React.FC = () => {
 
     try {
         // Call specialized service which now returns chartData
-        const { text, sentiment, chartData } = await analyzeDocument(ticker, docType);
+        const { text, sentiment, chartData, dominoData } = await analyzeDocument(ticker, docType);
         
         // Add Bot Message
         setChatMessages(prev => [...prev, {
@@ -352,6 +353,7 @@ const App: React.FC = () => {
             text: text,
             sentimentScore: sentiment,
             chartData: chartData, // Use the extracted chart data
+            dominoData: dominoData,
             timestamp: Date.now()
         }]);
     } catch (error) {
