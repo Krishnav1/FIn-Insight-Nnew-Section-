@@ -1,6 +1,5 @@
-
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { X, Send, TrendingUp, TrendingDown, Minus, Copy, ThumbsUp, ThumbsDown, Check, MessageCircle, FileText, Search, AlertOctagon, PieChart, Phone, Factory, Pin, Zap, Target, ArrowRight, Activity, AlertTriangle, Building2, Globe, Terminal } from 'lucide-react';
+import { X, Send, TrendingUp, TrendingDown, Minus, Copy, ThumbsUp, ThumbsDown, Check, MessageCircle, FileText, Search, AlertOctagon, PieChart, Phone, Factory, Pin, Zap, Target, ArrowRight, Activity, AlertTriangle, Building2, Globe, Terminal, Sparkles } from 'lucide-react';
 import { Article, ChatMessage, TickerSearchItem, DocumentType, PinnedItem, NewsInsight } from '../types';
 import { SEARCHABLE_TICKERS, MACROS, COMMANDS } from '../constants';
 import ReactMarkdown from 'react-markdown';
@@ -56,6 +55,33 @@ const SidebarLoadingIndicator = () => {
     </div>
   );
 };
+
+const ContextualSuggestions = ({ triggerType, item, onAction }: { triggerType: string, item: string, onAction: (text: string) => void }) => {
+    if (!triggerType || !item) return null;
+
+    const suggestions: Record<string, string[]> = {
+        '@': ["Analyze Earnings", "Check Valuation", "Latest News", "Compare Peers"],
+        '#': ["Analyze Sector Impact", "Market Trend", "Winners & Losers", "Historical Context"],
+        '/': ["Run Default"]
+    };
+
+    const actions = suggestions[triggerType] || [];
+
+    return (
+        <div className="absolute bottom-full left-0 mb-3 px-4 animate-fade-in flex gap-2 overflow-x-auto scrollbar-hide max-w-full">
+            <span className="text-xs text-gray-400 py-1 flex-shrink-0">Suggested:</span>
+            {actions.map(action => (
+                <button 
+                    key={action}
+                    onClick={() => onAction(action)}
+                    className="text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm transition-colors flex items-center gap-1 whitespace-nowrap"
+                >
+                    <Sparkles size={10} /> {action}
+                </button>
+            ))}
+        </div>
+    );
+}
 
 const SmartInsightCard = ({ data }: { data: NewsInsight }) => {
     return (
@@ -171,6 +197,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [selectedTicker, setSelectedTicker] = useState<TickerSearchItem | null>(null);
   const [showIntentMenu, setShowIntentMenu] = useState(false);
   
+  // Suggested Actions State
+  const [contextualItem, setContextualItem] = useState<string | null>(null);
+  const [contextualType, setContextualType] = useState<string | null>(null);
+  
   // Living Tickers State
   const [quickPeekTicker, setQuickPeekTicker] = useState<string | null>(null);
 
@@ -199,6 +229,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       
       const cursorPos = e.target.selectionStart || 0;
       setCursorIndex(cursorPos);
+
+      // Check if user just deleted content, clear suggestions
+      if (val === '') {
+          setContextualItem(null);
+          setContextualType(null);
+      }
 
       const textBeforeCursor = val.substring(0, cursorPos);
       const words = textBeforeCursor.split(/\s+/);
@@ -263,13 +299,26 @@ const Sidebar: React.FC<SidebarProps> = ({
       setShowSuggestions(false);
       setMentionQuery(null);
       
+      // Set Contextual State for Suggestion Pills
+      setContextualType(prefix);
+      setContextualItem(item.symbol);
+      
       // Trigger Intent Menu only for stocks (@)
       if (triggerType === '@') {
           setSelectedTicker(item);
-          setShowIntentMenu(true);
+          // setShowIntentMenu(true); // Disable auto-popup for cleaner UI, rely on pills
       }
       
       inputRef.current.focus();
+  };
+
+  const handleContextualAction = (action: string) => {
+      if (!contextualItem) return;
+      const finalPrompt = `${action} for ${contextualItem}`;
+      setInputValue(finalPrompt);
+      setContextualItem(null); // Clear context after selection
+      // Optional: focus input so user can hit enter or edit
+      inputRef.current?.focus();
   };
 
   const handleIntentAction = (docType: DocumentType) => {
@@ -289,6 +338,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       setInputValue('');
       setShowSuggestions(false);
       setShowIntentMenu(false);
+      setContextualItem(null);
     }
   };
 
@@ -606,6 +656,15 @@ const Sidebar: React.FC<SidebarProps> = ({
                         </button>
                     ))}
                 </div>
+             )}
+             
+             {/* Contextual Suggestion Pills (Appears after selecting # or @) */}
+             {(contextualItem && !showSuggestions) && (
+                <ContextualSuggestions 
+                    triggerType={contextualType || ''} 
+                    item={contextualItem} 
+                    onAction={handleContextualAction} 
+                />
              )}
 
             <div className="flex gap-2">

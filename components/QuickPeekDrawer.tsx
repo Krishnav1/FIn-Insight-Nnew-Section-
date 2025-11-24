@@ -1,6 +1,5 @@
-
 import React, { useMemo } from 'react';
-import { X, TrendingUp, TrendingDown, DollarSign, BarChart2, Activity, Globe, ExternalLink } from 'lucide-react';
+import { X, TrendingUp, TrendingDown, DollarSign, BarChart2, Activity, Globe, ExternalLink, Clock, Zap } from 'lucide-react';
 import { QuickPeekData } from '../types';
 import DynamicChart from './DynamicChart';
 
@@ -40,95 +39,126 @@ const QuickPeekDrawer: React.FC<QuickPeekDrawerProps> = ({ ticker, onClose }) =>
   if (!ticker || !data) return null;
 
   const isPos = data.changePercent >= 0;
+  const themeColor = isPos ? 'emerald' : 'rose';
+  const ThemeIcon = isPos ? TrendingUp : TrendingDown;
 
   return (
     <>
         {/* Backdrop */}
         <div 
-            className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-[60]"
+            className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[60] transition-opacity"
             onClick={onClose}
         />
         
         {/* Drawer */}
-        <div className="fixed inset-y-0 right-0 w-80 bg-white dark:bg-slate-900 shadow-2xl z-[70] border-l border-gray-200 dark:border-slate-700 animate-slide-left flex flex-col">
-             {/* Header */}
-             <div className="p-5 border-b border-gray-100 dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50">
-                 <div className="flex justify-between items-start mb-2">
-                     <div>
-                         <h2 className="text-2xl font-black text-gray-900 dark:text-white">{data.symbol}</h2>
-                         <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{data.sector}</span>
+        <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-theme-surface shadow-2xl z-[70] border-l border-theme-border animate-slide-left flex flex-col">
+             
+             {/* Premium Header */}
+             <div className="relative p-6 overflow-hidden bg-theme-bg border-b border-theme-border">
+                 {/* Background Gradient */}
+                 <div className={`absolute top-0 right-0 w-64 h-64 bg-${themeColor}-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none`}></div>
+
+                 <div className="relative z-10 flex justify-between items-start mb-4">
+                     <div className="flex flex-col">
+                         <h2 className="text-3xl font-black text-theme-text tracking-tight">{data.symbol}</h2>
+                         <span className="text-xs font-bold text-theme-muted uppercase tracking-wider">{data.sector}</span>
                      </div>
-                     <button onClick={onClose} className="p-1 hover:bg-gray-200 dark:hover:bg-slate-800 rounded-full text-gray-400"><X size={20}/></button>
+                     <button 
+                        onClick={onClose} 
+                        className="p-2 bg-theme-surface hover:bg-theme-bg rounded-full text-theme-muted hover:text-theme-text transition-colors border border-theme-border"
+                     >
+                        <X size={18}/>
+                     </button>
                  </div>
-                 <div className="flex items-end gap-3">
-                     <span className="text-3xl font-bold text-gray-900 dark:text-white">
+
+                 <div className="relative z-10 flex items-baseline gap-3">
+                     <span className="text-4xl font-mono font-bold text-theme-text">
                         ₹{data.price.toLocaleString('en-IN', {maximumFractionDigits: 2})}
                      </span>
-                     <span className={`text-sm font-bold mb-1.5 flex items-center ${isPos ? 'text-emerald-600' : 'text-rose-600'}`}>
-                         {isPos ? <TrendingUp size={16}/> : <TrendingDown size={16}/>}
-                         {Math.abs(data.changePercent).toFixed(2)}%
+                 </div>
+                 <div className={`relative z-10 flex items-center gap-2 mt-1 font-bold text-sm ${isPos ? 'text-emerald-500' : 'text-rose-500'}`}>
+                     <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${isPos ? 'bg-emerald-500/10' : 'bg-rose-500/10'}`}>
+                        <ThemeIcon size={14} />
+                        {Math.abs(data.changePercent).toFixed(2)}%
                      </span>
+                     <span className="text-theme-muted text-xs font-normal">Today</span>
                  </div>
              </div>
 
              {/* Content */}
-             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+             <div className="flex-1 overflow-y-auto custom-scrollbar bg-theme-bg">
                  
-                 {/* Mini Chart */}
-                 <div className="h-32 mb-6 -mx-2">
-                      <DynamicChart data={{
-                          type: 'area',
-                          title: 'Intraday',
-                          labels: Array.from({length:20}, (_,i)=>`${9+Math.floor(i/2)}:${i%2===0?'00':'30'}`),
-                          datasets: [{ label: 'Price', data: data.chartData }]
-                      }} />
+                 {/* Chart Section */}
+                 <div className="h-48 w-full bg-gradient-to-b from-theme-surface to-theme-bg border-b border-theme-border p-4 relative">
+                      <div className="absolute top-4 right-4 flex gap-1">
+                          {['1D', '1W', '1M'].map(t => (
+                              <span key={t} className={`text-[10px] font-bold px-2 py-1 rounded cursor-pointer ${t === '1D' ? 'bg-theme-accent text-white' : 'text-theme-muted hover:bg-theme-surface'}`}>{t}</span>
+                          ))}
+                      </div>
+                      <div className="h-full w-full pt-6">
+                        <DynamicChart data={{
+                            type: 'area',
+                            title: '',
+                            labels: Array.from({length:20}, (_,i)=>`${9+Math.floor(i/2)}:${i%2===0?'00':'30'}`),
+                            datasets: [{ label: 'Price', data: data.chartData }]
+                        }} />
+                      </div>
                  </div>
 
-                 {/* Key Stats Grid */}
-                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Fundamentals</h3>
-                 <div className="grid grid-cols-2 gap-3 mb-6">
-                     <div className="p-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-slate-700">
-                         <div className="text-gray-400 text-[10px] uppercase mb-1 flex items-center gap-1"><DollarSign size={10}/> Market Cap</div>
-                         <div className="font-bold text-gray-800 dark:text-gray-200">₹{data.marketCap}</div>
-                     </div>
-                     <div className="p-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-slate-700">
-                         <div className="text-gray-400 text-[10px] uppercase mb-1 flex items-center gap-1"><BarChart2 size={10}/> P/E Ratio</div>
-                         <div className="font-bold text-gray-800 dark:text-gray-200">{data.peRatio}</div>
-                     </div>
-                     <div className="p-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-slate-700">
-                         <div className="text-gray-400 text-[10px] uppercase mb-1">52W High</div>
-                         <div className="font-bold text-gray-800 dark:text-gray-200">₹{data.week52High.toFixed(0)}</div>
-                     </div>
-                     <div className="p-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-slate-700">
-                         <div className="text-gray-400 text-[10px] uppercase mb-1">52W Low</div>
-                         <div className="font-bold text-gray-800 dark:text-gray-200">₹{data.week52Low.toFixed(0)}</div>
-                     </div>
+                 <div className="p-6 space-y-6">
+                    {/* Key Stats Grid */}
+                    <div>
+                        <h3 className="text-xs font-bold text-theme-muted uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <Activity size={12} /> Key Fundamentals
+                        </h3>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3 bg-theme-surface rounded-xl border border-theme-border hover:border-theme-accent/30 transition-colors">
+                                <div className="text-theme-muted text-[10px] uppercase mb-1 flex items-center gap-1"><DollarSign size={10}/> Market Cap</div>
+                                <div className="font-bold text-theme-text font-mono">₹{data.marketCap}</div>
+                            </div>
+                            <div className="p-3 bg-theme-surface rounded-xl border border-theme-border hover:border-theme-accent/30 transition-colors">
+                                <div className="text-theme-muted text-[10px] uppercase mb-1 flex items-center gap-1"><BarChart2 size={10}/> P/E Ratio</div>
+                                <div className="font-bold text-theme-text font-mono">{data.peRatio}</div>
+                            </div>
+                            <div className="p-3 bg-theme-surface rounded-xl border border-theme-border hover:border-theme-accent/30 transition-colors">
+                                <div className="text-theme-muted text-[10px] uppercase mb-1">52W High</div>
+                                <div className="font-bold text-theme-text font-mono">₹{data.week52High.toFixed(0)}</div>
+                            </div>
+                            <div className="p-3 bg-theme-surface rounded-xl border border-theme-border hover:border-theme-accent/30 transition-colors">
+                                <div className="text-theme-muted text-[10px] uppercase mb-1">52W Low</div>
+                                <div className="font-bold text-theme-text font-mono">₹{data.week52Low.toFixed(0)}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* AI Sentiment */}
+                    <div className={`p-5 rounded-2xl border relative overflow-hidden ${
+                        isPos ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'
+                    }`}>
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className={`p-1.5 rounded-lg ${isPos ? 'bg-emerald-500/20 text-emerald-500' : 'bg-rose-500/20 text-rose-500'}`}>
+                                    <Zap size={16} />
+                                </div>
+                                <h3 className={`text-sm font-bold ${isPos ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                    AI Verdict: {data.sentiment}
+                                </h3>
+                            </div>
+                            <p className="text-xs text-theme-muted leading-relaxed">
+                                FinGenie analyzed <strong>{data.newsCount} recent sources</strong>. Momentum indicators suggest {isPos ? 'strength' : 'weakness'} in the short term.
+                            </p>
+                        </div>
+                    </div>
+
+                    <a 
+                        href={`https://www.google.com/finance/quote/${ticker}:NSE`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-4 flex items-center justify-center gap-2 bg-theme-text text-theme-bg hover:opacity-90 rounded-xl font-bold text-sm transition-all shadow-lg"
+                    >
+                        Detailed Analysis <ExternalLink size={14} />
+                    </a>
                  </div>
-
-                 {/* AI Sentiment */}
-                 <div className={`p-4 rounded-xl mb-6 border ${
-                     isPos ? 'bg-emerald-50 border-emerald-100 dark:bg-emerald-900/10 dark:border-emerald-900/30' : 'bg-rose-50 border-rose-100 dark:bg-rose-900/10 dark:border-rose-900/30'
-                 }`}>
-                     <div className="flex items-center gap-2 mb-1">
-                         <Activity size={16} className={isPos ? 'text-emerald-600' : 'text-rose-600'} />
-                         <h3 className={`text-sm font-bold ${isPos ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300'}`}>
-                             AI Verdict: {data.sentiment}
-                         </h3>
-                     </div>
-                     <p className="text-xs text-gray-600 dark:text-gray-400">
-                         Based on analysis of {data.newsCount} recent news articles and market momentum.
-                     </p>
-                 </div>
-
-                 <a 
-                    href={`https://www.google.com/finance/quote/${ticker}:NSE`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-3 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all"
-                 >
-                     Open in Google Finance <ExternalLink size={14} />
-                 </a>
-
              </div>
         </div>
     </>

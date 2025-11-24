@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Plus, X, FileText, Phone, AlertOctagon, Activity, Search, Factory, BrainCircuit, BarChart2, Shield, Scale, ChevronDown, ChevronUp, Zap, HelpCircle, TrendingUp, TrendingDown, DollarSign, MousePointer2, Terminal, Building2, Globe } from 'lucide-react';
+import { Send, Plus, X, FileText, Phone, AlertOctagon, Activity, Search, Factory, BrainCircuit, BarChart2, Shield, Scale, ChevronDown, ChevronUp, Zap, HelpCircle, TrendingUp, TrendingDown, DollarSign, MousePointer2, Terminal, Building2, Globe, Sparkles } from 'lucide-react';
 import { ChatMessage, TickerSearchItem, DocumentType, PinnedItem, EvidenceDocument, BingoData } from '../types';
 import { startChatSession, sendChatMessage, analyzeDocument, getPortfolioHealthReport } from '../services/geminiService';
 import { USER_PORTFOLIO, SEARCHABLE_TICKERS, MACROS, COMMANDS } from '../constants';
@@ -248,7 +247,7 @@ const WorkflowWizard: React.FC<WorkflowWizardProps> = ({ type, onClose, onSubmit
                     disabled={!inputs[config.steps[step-1].key]}
                     className="bg-theme-accent hover:bg-theme-accent/90 text-white px-6 py-2 rounded-lg font-bold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                  >
-                     {step === config.steps.length ? 'Run Analysis' : 'Next'}
+                     {step === config.steps.length ? 'Review Prompt' : 'Next'}
                  </button>
              </div>
         </div>
@@ -259,10 +258,10 @@ const WorkflowWizard: React.FC<WorkflowWizardProps> = ({ type, onClose, onSubmit
 
 const WorkflowSelector = ({ onSelect }: { onSelect: (type: WizardType) => void }) => {
     const workflows = [
-        { id: 'compare', title: "Compare Stocks", desc: "Compare A vs B", icon: Scale, color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-900/10", border: "hover:border-orange-500" },
-        { id: 'risk', title: "Safe or Risky?", desc: "Check for red flags", icon: Shield, color: "text-red-500", bg: "bg-red-50 dark:bg-red-900/10", border: "hover:border-red-500" },
-        { id: 'valuation', title: "Is it Overvalued?", desc: "Check price fairness", icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/10", border: "hover:border-emerald-500" },
-        { id: 'macro', title: "What If...?", desc: "Simulate events", icon: Activity, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/10", border: "hover:border-blue-500" },
+        { id: 'compare', title: "Compare Stocks", desc: "Compare A vs B", example: "Compare TCS vs Infy for growth", icon: Scale, color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-900/10", border: "hover:border-orange-500" },
+        { id: 'risk', title: "Safe or Risky?", desc: "Check for red flags", example: "Analyze Adani Ent debt risks", icon: Shield, color: "text-red-500", bg: "bg-red-50 dark:bg-red-900/10", border: "hover:border-red-500" },
+        { id: 'valuation', title: "Is it Overvalued?", desc: "Check price fairness", example: "Is Reliance overvalued now?", icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/10", border: "hover:border-emerald-500" },
+        { id: 'macro', title: "What If...?", desc: "Simulate events", example: "Impact of oil at $100 on Paints", icon: Activity, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/10", border: "hover:border-blue-500" },
     ];
 
     return (
@@ -277,7 +276,10 @@ const WorkflowSelector = ({ onSelect }: { onSelect: (type: WizardType) => void }
                         <w.icon size={20} />
                     </div>
                     <div className="font-bold text-sm text-gray-900 dark:text-white group-hover:underline decoration-2 underline-offset-2">{w.title}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{w.desc}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">{w.desc}</div>
+                    <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono italic">
+                        Try: "{w.example}"
+                    </div>
                 </button>
             ))}
         </div>
@@ -300,6 +302,36 @@ const InputLegend = ({ onTrigger }: { onTrigger: (char: string) => void }) => (
         </button>
     </div>
 );
+
+// --- CONTEXTUAL SUGGESTIONS ---
+
+const ContextualSuggestions = ({ triggerType, item, onAction }: { triggerType: string, item: string, onAction: (text: string) => void }) => {
+    if (!triggerType || !item) return null;
+
+    const suggestions: Record<string, string[]> = {
+        '@': ["Analyze Earnings", "Check Valuation", "Latest News", "Compare Peers"],
+        '#': ["Analyze Sector Impact", "Market Trend", "Winners & Losers", "Historical Context"],
+        '/': ["Run Default"]
+    };
+
+    const actions = suggestions[triggerType] || [];
+
+    return (
+        <div className="absolute bottom-full left-0 mb-3 px-2 animate-fade-in flex gap-2">
+            <span className="text-xs text-gray-400 py-1">Suggested:</span>
+            {actions.map(action => (
+                <button 
+                    key={action}
+                    onClick={() => onAction(action)}
+                    className="text-xs bg-theme-surface border border-theme-border text-theme-accent px-3 py-1 rounded-full hover:bg-theme-bg shadow-sm transition-colors flex items-center gap-1"
+                >
+                    <Sparkles size={10} /> {action}
+                </button>
+            ))}
+        </div>
+    );
+}
+
 
 // --- MAIN PAGE COMPONENT ---
 
@@ -329,6 +361,11 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
   const [triggerType, setTriggerType] = useState<'@' | '#' | '/' | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<TickerSearchItem | null>(null);
   const [showIntentMenu, setShowIntentMenu] = useState(false);
+  
+  // Suggested Actions State
+  const [contextualItem, setContextualItem] = useState<string | null>(null);
+  const [contextualType, setContextualType] = useState<string | null>(null);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId)!, [tabs, activeTabId]);
@@ -370,6 +407,12 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
       
       const cursorPos = e.target.selectionStart || 0;
       setCursorIndex(cursorPos);
+
+      // Check if user just deleted content, clear suggestions
+      if (val === '') {
+          setContextualItem(null);
+          setContextualType(null);
+      }
 
       const textBeforeCursor = val.substring(0, cursorPos);
       const words = textBeforeCursor.split(/\s+/);
@@ -439,15 +482,32 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
       const startPos = textBeforeCursor.lastIndexOf(lastWord);
       const prefix = triggerType || '';
       
-      setInputValue(val.substring(0, startPos) + `${prefix}${item.symbol} ` + val.substring(cursorIndex));
+      // Update input
+      const newVal = val.substring(0, startPos) + `${prefix}${item.symbol} ` + val.substring(cursorIndex);
+      setInputValue(newVal);
+      
+      // Set Contextual State for Suggestion Pills
+      setContextualType(prefix);
+      setContextualItem(item.symbol);
+
       setShowSuggestions(false);
       setMentionQuery(null);
       
       if (triggerType === '@') {
           setSelectedTicker(item);
-          setShowIntentMenu(true);
+          // Don't show intent menu automatically if we are showing contextual pills, keeps UI cleaner
+          // setShowIntentMenu(true); 
       }
       inputRef.current.focus();
+  };
+
+  const handleContextualAction = (action: string) => {
+      if (!contextualItem) return;
+      const finalPrompt = `${action} for ${contextualItem}`;
+      setInputValue(finalPrompt);
+      setContextualItem(null); // Clear context after selection
+      // Optional: focus input so user can hit enter or edit
+      inputRef.current?.focus();
   };
 
   // --- CORE AI ACTIONS ---
@@ -466,6 +526,7 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
       setInputValue('');
       setShowSuggestions(false);
       setShowIntentMenu(false);
+      setContextualItem(null);
       setActiveWizard(null); // Close wizard if open
       setLoading(true);
 
@@ -517,6 +578,12 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
       } finally {
           setLoading(false);
       }
+  };
+
+  const handleWizardSubmit = (prompt: string) => {
+      setInputValue(prompt);
+      setActiveWizard(null);
+      inputRef.current?.focus();
   };
 
   const handleSmartAction = async (ticker: string, docType: DocumentType) => {
@@ -723,7 +790,7 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                     <WorkflowWizard 
                         type={activeWizard} 
                         onClose={() => setActiveWizard(null)} 
-                        onSubmit={handleSendMessage}
+                        onSubmit={handleWizardSubmit}
                     />
                 )}
                 
@@ -774,6 +841,15 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                          ))}
                     </div>
                 )}
+                
+                {/* Contextual Suggestion Pills (Appears after selecting # or @) */}
+                {(contextualItem && !showSuggestions) && (
+                    <ContextualSuggestions 
+                        triggerType={contextualType || ''} 
+                        item={contextualItem} 
+                        onAction={handleContextualAction} 
+                    />
+                )}
 
                 {/* Input Legend Bar */}
                 <InputLegend onTrigger={handleTriggerClick} />
@@ -794,7 +870,7 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                                 }
                             }
                         }}
-                        placeholder="Type here..."
+                        placeholder="Type here... (e.g. Compare TCS vs Infy)"
                         className="flex-1 bg-theme-bg border border-theme-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-theme-accent/50 focus:ring-1 focus:ring-theme-accent/50 transition-all placeholder-theme-muted text-theme-text"
                         disabled={loading}
                     />
