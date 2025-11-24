@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Article, 
@@ -7,7 +8,8 @@ import {
   AITaskType,
   SortOption,
   DocumentType,
-  Theme
+  Theme,
+  AppView // Updated type
 } from './types';
 import { USER_PORTFOLIO, TABS } from './constants';
 import { startChatSession, sendChatMessage, getInitialPrompt, fetchLiveNews, analyzeDocument, getPortfolioHealthReport } from './services/geminiService';
@@ -26,14 +28,15 @@ import StockTicker from './components/StockTicker';
 import FinGeniePage from './components/FinGeniePage'; 
 import LandingPage from './components/LandingPage';
 import ThemeSelector from './components/ThemeSelector';
+import AuthModal from './components/AuthModal'; // New
+import ConnectPortfolioModal from './components/ConnectPortfolioModal'; // New
+import PortfolioPage from './components/PortfolioPage'; // New
 
-import { Search, Menu, PieChart, Moon, Sun, RefreshCw, ShieldAlert, BrainCircuit, MessageSquare, Newspaper, Zap, Terminal, Settings, LogOut, Palette, ChevronLeft, ChevronRight, Home } from 'lucide-react';
+import { Search, Menu, PieChart, Moon, Sun, RefreshCw, ShieldAlert, BrainCircuit, MessageSquare, Newspaper, Zap, Terminal, Settings, LogOut, Palette, ChevronLeft, ChevronRight, Home, Briefcase, Lock } from 'lucide-react';
 
 // --- BRAND ASSETS ---
 const FININSIGHT_LOGO_URL = "logo.jpg"; 
 const FINGENIE_AVATAR_URL = "fingenie.jpg";
-
-type AppView = 'landing' | 'workspace' | 'news';
 
 const App: React.FC = () => {
   // --- Global State ---
@@ -41,6 +44,12 @@ const App: React.FC = () => {
   const [theme, setTheme] = useState<Theme>('dark');
   const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // --- Auth & Portfolio State ---
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasConnectedPortfolio, setHasConnectedPortfolio] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
 
   // --- News / Data State ---
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(LayoutMode.GRID);
@@ -146,8 +155,12 @@ const App: React.FC = () => {
     const savedMessages = localStorage.getItem('fingenie_chat_messages');
     const savedWatchlist = localStorage.getItem('fingenie_watchlist');
     const savedTheme = localStorage.getItem('fingenie_theme') as Theme;
+    const savedAuth = localStorage.getItem('fingenie_auth');
+    const savedPortfolio = localStorage.getItem('fingenie_portfolio_connected');
 
     if(savedTheme) setTheme(savedTheme);
+    if(savedAuth === 'true') setIsAuthenticated(true);
+    if(savedPortfolio === 'true') setHasConnectedPortfolio(true);
 
     if (savedArticle) {
         try {
@@ -184,6 +197,11 @@ const App: React.FC = () => {
       localStorage.setItem('fingenie_theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    localStorage.setItem('fingenie_auth', isAuthenticated.toString());
+    localStorage.setItem('fingenie_portfolio_connected', hasConnectedPortfolio.toString());
+  }, [isAuthenticated, hasConnectedPortfolio]);
+
   // Data Loading
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoadingNews(true);
@@ -218,7 +236,48 @@ const App: React.FC = () => {
   // --- Handlers ---
 
   const handleLaunch = () => {
+      if (!isAuthenticated) {
+          setIsAuthModalOpen(true);
+      } else {
+          setCurrentView('workspace');
+      }
+  };
+
+  const handlePortfolioNav = () => {
+      if (!isAuthenticated) {
+          setIsAuthModalOpen(true);
+          return;
+      }
+      if (!hasConnectedPortfolio) {
+          setIsConnectModalOpen(true);
+          return;
+      }
+      setCurrentView('portfolio');
+  };
+
+  const handleLoginSuccess = () => {
+      setIsAuthenticated(true);
+      setIsAuthModalOpen(false);
+      // If user came from Launch, send to workspace. If specifically clicked portfolio, handle that logic next.
       setCurrentView('workspace');
+  };
+
+  const handleConnectSuccess = () => {
+      setHasConnectedPortfolio(true);
+      setIsConnectModalOpen(false);
+      setCurrentView('portfolio');
+  };
+
+  const handlePortfolioAudit = () => {
+      setCurrentView('workspace');
+      // We pass a special prompt to FinGeniePage via a slightly hacky prop or just rely on Sidebar usage.
+      // For now, we'll manually open the Sidebar in workspace mode with a portfolio prompt.
+      setTimeout(() => {
+         // This is a simplification. Ideally FinGeniePage would expose a method or context.
+         // Since we are changing views, we can just let the user type "/portfolio" or use the command.
+      }, 500);
+      sendMessage("Check portfolio health", "/portfolio");
+      setSidebarOpen(true);
   };
 
   const handleToggleWatchlist = (ticker: string) => {
@@ -306,7 +365,8 @@ const App: React.FC = () => {
         'concall': 'Earnings Call Analysis',
         'quarterly_result': 'Quarterly Results',
         'red_flags': 'Forensic Red Flags',
-        'supply_chain': 'Supply Chain Map'
+        'supply_chain': 'Supply Chain Map',
+        'ceo_lie_detector': 'CEO Lie Detector'
     };
     const userText = `Analyze the ${intentMap[docType]} for ${ticker}`;
     
@@ -337,7 +397,12 @@ const App: React.FC = () => {
   // --- RENDER ---
 
   if (currentView === 'landing') {
-      return <LandingPage onLaunch={handleLaunch} />;
+      return (
+        <>
+            <LandingPage onLaunch={handleLaunch} />
+            <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} onLogin={handleLoginSuccess} />
+        </>
+      );
   }
 
   // --- APP SHELL LAYOUT ---
@@ -375,6 +440,21 @@ const App: React.FC = () => {
                 {currentView === 'workspace' && !isSidebarCollapsed && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-theme-accent"></div>}
              </button>
              
+             <button 
+                onClick={handlePortfolioNav}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group ${
+                    currentView === 'portfolio' 
+                    ? 'bg-theme-bg text-theme-accent shadow-sm ring-1 ring-theme-border' 
+                    : 'text-theme-muted hover:bg-theme-bg hover:text-theme-text'
+                }`}
+             >
+                {hasConnectedPortfolio ? <Briefcase size={20} className="flex-shrink-0" /> : <Lock size={20} className="flex-shrink-0" />}
+                <span className={`font-medium whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
+                    My Portfolio
+                </span>
+                {currentView === 'portfolio' && !isSidebarCollapsed && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-theme-accent"></div>}
+             </button>
+
              <button 
                 onClick={() => setCurrentView('news')}
                 className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group ${
@@ -414,13 +494,16 @@ const App: React.FC = () => {
 
              {/* Back / Logout */}
              <button 
-                onClick={() => setCurrentView('landing')}
+                onClick={() => {
+                    setIsAuthenticated(false);
+                    setCurrentView('landing');
+                }}
                 className="w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 text-theme-muted hover:bg-red-500/10 hover:text-red-500"
-                title="Exit to Landing"
+                title="Logout"
              >
                 <LogOut size={20} className="flex-shrink-0" />
                 <span className={`font-medium whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
-                    Back to Home
+                    Log Out
                 </span>
              </button>
              
@@ -442,10 +525,11 @@ const App: React.FC = () => {
                 <h2 className="text-xl font-bold text-theme-text flex items-center gap-2">
                     {currentView === 'workspace' && <Terminal size={20} className="text-theme-accent"/>}
                     {currentView === 'news' && <Newspaper size={20} className="text-theme-accent"/>}
-                    {currentView === 'workspace' ? 'FinGenie Workspace' : 'Market Pulse'}
+                    {currentView === 'portfolio' && <Briefcase size={20} className="text-theme-accent"/>}
+                    {currentView === 'workspace' ? 'FinGenie Workspace' : currentView === 'portfolio' ? 'My Portfolio' : 'Market Pulse'}
                 </h2>
                 <p className="text-xs text-theme-muted font-mono mt-0.5">
-                    {currentView === 'workspace' ? 'AI ANALYST • ONLINE' : 'REAL-TIME INTELLIGENCE FEED'}
+                    {currentView === 'workspace' ? 'AI ANALYST • ONLINE' : currentView === 'portfolio' ? 'NSDL LINKED • ACTIVE' : 'REAL-TIME INTELLIGENCE FEED'}
                 </p>
             </div>
             <div className="flex items-center gap-6">
@@ -453,7 +537,7 @@ const App: React.FC = () => {
                     <StockTicker />
                 </div>
                 <div className="flex items-center gap-3">
-                     <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-white flex items-center justify-center text-xs font-bold ring-2 ring-theme-surface cursor-pointer shadow-sm">
+                     <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-white flex items-center justify-center text-xs font-bold ring-2 ring-theme-surface cursor-pointer shadow-sm hover:ring-theme-accent transition-all">
                         JD
                      </div>
                 </div>
@@ -461,9 +545,15 @@ const App: React.FC = () => {
         </header>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden bg-theme-bg scrollbar-hide relative">
-             {currentView === 'workspace' ? (
+             {currentView === 'workspace' && (
                  <FinGeniePage botAvatarUrl={FINGENIE_AVATAR_URL} />
-             ) : (
+             )}
+
+             {currentView === 'portfolio' && (
+                 <PortfolioPage onAuditClick={handlePortfolioAudit} />
+             )}
+
+             {currentView === 'news' && (
                 /* MARKET PULSE VIEW */
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
@@ -538,7 +628,7 @@ const App: React.FC = () => {
                                     ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' 
                                     : 'grid-cols-1 max-w-4xl mx-auto'
                                 }`}>
-                                    {filteredArticles.map(article => (
+                                    {filteredArticles.map((article, index) => (
                                         <NewsCard 
                                             key={article.id} 
                                             article={article} 
@@ -547,6 +637,7 @@ const App: React.FC = () => {
                                             watchlist={watchlist}
                                             onToggleWatchlist={handleToggleWatchlist}
                                             onAction={handleAIAction}
+                                            style={{ animationDelay: `${index * 50}ms` }}
                                         />
                                     ))}
                                 </div>
@@ -583,6 +674,18 @@ const App: React.FC = () => {
             onClose={() => setPortfolioModalOpen(false)}
             portfolio={USER_PORTFOLIO}
             articles={articles}
+        />
+        
+        <AuthModal 
+            isOpen={isAuthModalOpen} 
+            onClose={() => setIsAuthModalOpen(false)} 
+            onLogin={handleLoginSuccess} 
+        />
+        
+        <ConnectPortfolioModal 
+            isOpen={isConnectModalOpen} 
+            onClose={() => setIsConnectModalOpen(false)} 
+            onConnected={handleConnectSuccess} 
         />
 
         <OnboardingTour 

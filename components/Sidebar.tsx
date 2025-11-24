@@ -1,6 +1,7 @@
+
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { X, Send, TrendingUp, TrendingDown, Minus, Copy, ThumbsUp, ThumbsDown, Check, MessageCircle, FileText, Search, AlertOctagon, PieChart, Phone, Factory, Pin, Zap, Target, ArrowRight, Activity, AlertTriangle, Building2, Globe, Terminal, Sparkles } from 'lucide-react';
-import { Article, ChatMessage, TickerSearchItem, DocumentType, PinnedItem, NewsInsight } from '../types';
+import { X, Send, TrendingUp, TrendingDown, Minus, Copy, ThumbsUp, ThumbsDown, Check, MessageCircle, FileText, Search, AlertOctagon, PieChart, Phone, Factory, Pin, Zap, Target, ArrowRight, Activity, AlertTriangle, Building2, Globe, Terminal, Sparkles, ExternalLink } from 'lucide-react';
+import { Article, ChatMessage, TickerSearchItem, DocumentType, PinnedItem, NewsInsight, SourceLink } from '../types';
 import { SEARCHABLE_TICKERS, MACROS, COMMANDS } from '../constants';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -79,6 +80,47 @@ const ContextualSuggestions = ({ triggerType, item, onAction }: { triggerType: s
                     <Sparkles size={10} /> {action}
                 </button>
             ))}
+        </div>
+    );
+}
+
+const SourceChips = ({ sources }: { sources: SourceLink[] }) => {
+    return (
+        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <span className="text-[10px] text-gray-400 font-bold uppercase py-0.5">Sources:</span>
+            {sources.map((source, i) => (
+                <a 
+                    key={i} 
+                    href={source.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-[10px] text-gray-600 dark:text-gray-300 hover:text-blue-500 hover:border-blue-500 transition-colors truncate max-w-[120px]"
+                >
+                    <ExternalLink size={10} />
+                    {source.title}
+                </a>
+            ))}
+        </div>
+    );
+}
+
+const FollowUpSuggestions = ({ questions, onSelect }: { questions: string[], onSelect: (q: string) => void }) => {
+    return (
+        <div className="flex flex-col gap-2 mt-4 animate-fade-in">
+            <span className="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1">
+                <MessageCircle size={10} /> Suggested Follow-ups
+            </span>
+            <div className="flex flex-wrap gap-2">
+                {questions.map((q, i) => (
+                    <button 
+                        key={i}
+                        onClick={() => onSelect(q)}
+                        className="text-left text-xs bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 px-3 py-2 rounded-xl hover:bg-white dark:hover:bg-gray-700 hover:border-blue-400 dark:hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-300 transition-all shadow-sm"
+                    >
+                        {q}
+                    </button>
+                ))}
+            </div>
         </div>
     );
 }
@@ -505,6 +547,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                          </ReactMarkdown>
                     </div>
 
+                    {/* Citations / Sources */}
+                    {msg.sources && msg.sources.length > 0 && <SourceChips sources={msg.sources} />}
+
                     {/* Widgets */}
                     {msg.sentimentScore !== undefined && <SentimentGauge score={msg.sentimentScore} />}
                     
@@ -531,6 +576,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                          </div>
                     )}
                     
+                    {/* Suggested Follow-Ups */}
+                     {msg.followUp && msg.followUp.length > 0 && (
+                         <FollowUpSuggestions 
+                            questions={msg.followUp} 
+                            onSelect={(q) => onSendMessage(q)} 
+                         />
+                     )}
+
                     {/* Feedback & Copy Actions */}
                     <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
                         <div className="flex gap-1">

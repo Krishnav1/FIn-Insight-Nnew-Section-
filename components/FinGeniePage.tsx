@@ -1,6 +1,8 @@
+
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Plus, X, FileText, Phone, AlertOctagon, Activity, Search, Factory, BrainCircuit, BarChart2, Shield, Scale, ChevronDown, ChevronUp, Zap, HelpCircle, TrendingUp, TrendingDown, DollarSign, MousePointer2, Terminal, Building2, Globe, Sparkles } from 'lucide-react';
-import { ChatMessage, TickerSearchItem, DocumentType, PinnedItem, EvidenceDocument, BingoData } from '../types';
+import { Send, Plus, X, FileText, Phone, AlertOctagon, Activity, Search, Factory, BrainCircuit, BarChart2, Shield, Scale, ChevronDown, ChevronUp, Zap, HelpCircle, TrendingUp, TrendingDown, DollarSign, MousePointer2, Terminal, Building2, Globe, Sparkles, ExternalLink, MessageSquare } from 'lucide-react';
+import { ChatMessage, TickerSearchItem, DocumentType, PinnedItem, EvidenceDocument, BingoData, SourceLink } from '../types';
 import { startChatSession, sendChatMessage, analyzeDocument, getPortfolioHealthReport } from '../services/geminiService';
 import { USER_PORTFOLIO, SEARCHABLE_TICKERS, MACROS, COMMANDS } from '../constants';
 import ReactMarkdown from 'react-markdown';
@@ -27,38 +29,70 @@ interface WorkspaceTab {
 
 // --- SUB-COMPONENTS ---
 
-const LoadingIndicator = ({ avatarUrl }: { avatarUrl: string }) => {
-    const [textIndex, setTextIndex] = useState(0);
-    const loadingTexts = [
-        "Reading market data...",
-        "Checking financial health...",
-        "Analyzing sentiment...",
-        "Looking for red flags...",
-        "Comparing with peers...",
-        "Synthesizing simple insights..."
-    ];
+const ContextAwareLoading = ({ lastUserMessage }: { lastUserMessage?: string }) => {
+    const [stepIndex, setStepIndex] = useState(0);
+    const [steps, setSteps] = useState<string[]>(["Initializing AI..."]);
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setTextIndex((prev) => (prev + 1) % loadingTexts.length);
-        }, 2000);
-        return () => clearInterval(interval);
-    }, []);
+        if (!lastUserMessage) {
+            setSteps(["Connecting to market data...", "Calibrating models...", "Ready."]);
+            return;
+        }
+
+        const msg = lastUserMessage.toLowerCase();
+        let newSteps = ["Analyzing request..."];
+
+        if (msg.includes("compare") || msg.includes("vs")) {
+            newSteps = ["Fetching Ticker A Financials...", "Fetching Ticker B Financials...", "Aligning Valuation Metrics...", "Generating Comparison Table..."];
+        } else if (msg.includes("risk") || msg.includes("safe") || msg.includes("debt")) {
+            newSteps = ["Scanning Balance Sheet...", "Checking Debt Covenants...", "Analyzing Cash Flow Stability...", "Looking for Red Flags..."];
+        } else if (msg.includes("valuation") || msg.includes("fair") || msg.includes("price")) {
+            newSteps = ["Retrieving P/E and PEG Ratios...", "Comparing with Industry Peers...", "Projecting Future Growth...", "Calculating Fair Value..."];
+        } else if (msg.includes("ceo") || msg.includes("lie") || msg.includes("management")) {
+            newSteps = ["Parsing Earnings Call Transcript...", "Analyzing Tone vs. Financials...", "Detecting Evasiveness...", "Fact-checking Optimism..."];
+        } else {
+            newSteps = ["Reading market data...", "Checking financial health...", "Synthesizing insights..."];
+        }
+        
+        setSteps(newSteps);
+        setStepIndex(0);
+    }, [lastUserMessage]);
+
+    useEffect(() => {
+        if (stepIndex < steps.length - 1) {
+            const timeout = setTimeout(() => {
+                setStepIndex(prev => prev + 1);
+            }, 1200); // 1.2s per step
+            return () => clearTimeout(timeout);
+        }
+    }, [stepIndex, steps]);
 
     return (
         <div className="flex gap-4 max-w-4xl mx-auto animate-slide-up pl-4 mt-4">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center animate-orb-green flex-shrink-0">
-                <img src={avatarUrl} className="w-6 h-6 rounded-full object-cover opacity-90" alt="Bot" />
+            <div className="w-8 h-8 rounded-full flex items-center justify-center animate-pulse flex-shrink-0 bg-theme-surface border border-theme-border">
+                <BrainCircuit className="w-5 h-5 text-theme-accent" />
             </div>
             <div className="flex flex-col justify-center mt-1">
-                 <div className="flex items-center gap-1.5 mb-1">
-                    <span className="w-1.5 h-1.5 bg-theme-accent rounded-full animate-bounce"></span>
-                    <span className="w-1.5 h-1.5 bg-theme-accent rounded-full animate-bounce delay-100"></span>
-                    <span className="w-1.5 h-1.5 bg-theme-accent rounded-full animate-bounce delay-200"></span>
+                 <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-theme-text uppercase tracking-wider">Thinking Process</span>
+                    <span className="flex gap-1">
+                        <span className="w-1 h-1 bg-theme-accent rounded-full animate-bounce"></span>
+                        <span className="w-1 h-1 bg-theme-accent rounded-full animate-bounce delay-75"></span>
+                        <span className="w-1 h-1 bg-theme-accent rounded-full animate-bounce delay-150"></span>
+                    </span>
                 </div>
-                <span className="text-xs font-mono text-theme-accent animate-pulse transition-all duration-500">
-                    {loadingTexts[textIndex]}
-                </span>
+                <div className="h-5 overflow-hidden relative">
+                    {steps.map((step, i) => (
+                        <span 
+                            key={i}
+                            className={`absolute top-0 left-0 text-xs font-mono text-theme-muted transition-all duration-500 transform ${
+                                i === stepIndex ? 'opacity-100 translate-y-0' : i < stepIndex ? 'opacity-0 -translate-y-full' : 'opacity-0 translate-y-full'
+                            }`}
+                        >
+                            {step}
+                        </span>
+                    ))}
+                </div>
             </div>
         </div>
     );
@@ -85,6 +119,47 @@ const ReasoningAccordion = ({ thoughts }: { thoughts: string }) => {
                      </p>
                 </div>
             )}
+        </div>
+    );
+}
+
+const SourceChips = ({ sources }: { sources: SourceLink[] }) => {
+    return (
+        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-theme-border/50">
+            <span className="text-[10px] text-theme-muted font-bold uppercase py-0.5">Sources:</span>
+            {sources.map((source, i) => (
+                <a 
+                    key={i} 
+                    href={source.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-theme-surface border border-theme-border text-[10px] text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-colors truncate max-w-[150px]"
+                >
+                    <ExternalLink size={10} />
+                    {source.title}
+                </a>
+            ))}
+        </div>
+    );
+}
+
+const FollowUpSuggestions = ({ questions, onSelect }: { questions: string[], onSelect: (q: string) => void }) => {
+    return (
+        <div className="flex flex-col gap-2 mt-4 animate-fade-in">
+            <span className="text-[10px] font-bold text-theme-muted uppercase flex items-center gap-1">
+                <MessageSquare size={10} /> Suggested Follow-ups
+            </span>
+            <div className="flex flex-wrap gap-2">
+                {questions.map((q, i) => (
+                    <button 
+                        key={i}
+                        onClick={() => onSelect(q)}
+                        className="text-left text-xs bg-theme-bg border border-theme-border text-theme-text px-3 py-2 rounded-xl hover:bg-theme-surface hover:border-theme-accent hover:text-theme-accent transition-all shadow-sm"
+                    >
+                        {q}
+                    </button>
+                ))}
+            </div>
         </div>
     );
 }
@@ -137,7 +212,7 @@ const EarningsBingo = ({ data }: { data: BingoData }) => {
 
 // --- NEW WORKFLOW WIZARD ---
 
-type WizardType = 'compare' | 'risk' | 'valuation' | 'macro';
+type WizardType = 'compare' | 'risk' | 'valuation' | 'macro' | 'lie_detector';
 
 interface WorkflowWizardProps {
     type: WizardType;
@@ -191,6 +266,16 @@ const WorkflowWizard: React.FC<WorkflowWizardProps> = ({ type, onClose, onSubmit
                     { key: "sector", label: "Which sector?", placeholder: "e.g., Paints, Banking, Defense" }
                 ],
                 promptTemplate: (i: any) => `Simulate this scenario: ${i.event}. How would this impact the ${i.sector} sector in India? List the winners and losers.`
+            };
+            case 'lie_detector': return {
+                title: "CEO Lie Detector",
+                icon: AlertOctagon,
+                color: "text-purple-500",
+                steps: [
+                    { key: "stock", label: "Which Stock?", placeholder: "Enter symbol..." },
+                    { key: "context", label: "Recent context?", placeholder: "e.g. Latest earnings call, recent scandal" }
+                ],
+                promptTemplate: (i: any) => `Perform a 'CEO Lie Detector' test on ${i.stock} regarding ${i.context}. Compare management's optimistic tone in recent calls against the cold hard numbers in the financial statements. Highlight any contradictions or evasive answers.`
             };
             default: return null;
         }
@@ -262,10 +347,11 @@ const WorkflowSelector = ({ onSelect }: { onSelect: (type: WizardType) => void }
         { id: 'risk', title: "Safe or Risky?", desc: "Check for red flags", example: "Analyze Adani Ent debt risks", icon: Shield, color: "text-red-500", bg: "bg-red-50 dark:bg-red-900/10", border: "hover:border-red-500" },
         { id: 'valuation', title: "Is it Overvalued?", desc: "Check price fairness", example: "Is Reliance overvalued now?", icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/10", border: "hover:border-emerald-500" },
         { id: 'macro', title: "What If...?", desc: "Simulate events", example: "Impact of oil at $100 on Paints", icon: Activity, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/10", border: "hover:border-blue-500" },
+        { id: 'lie_detector', title: "CEO Lie Detector", desc: "Tone vs Reality", example: "Did the CEO avoid questions?", icon: AlertOctagon, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/10", border: "hover:border-purple-500" },
     ];
 
     return (
-        <div className="grid grid-cols-2 gap-3 mt-6 max-w-xl mx-auto">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-6 max-w-2xl mx-auto">
             {workflows.map((w) => (
                 <button 
                     key={w.id}
@@ -277,7 +363,7 @@ const WorkflowSelector = ({ onSelect }: { onSelect: (type: WizardType) => void }
                     </div>
                     <div className="font-bold text-sm text-gray-900 dark:text-white group-hover:underline decoration-2 underline-offset-2">{w.title}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">{w.desc}</div>
-                    <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono italic">
+                    <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono italic truncate">
                         Try: "{w.example}"
                     </div>
                 </button>
@@ -560,6 +646,8 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
               thoughts: result.thoughts,
               sentimentScore: result.sentiment,
               suggestions: result.suggestions,
+              sources: result.sources,
+              followUp: result.followUp,
               chartData: result.chartData,
               dominoData: result.dominoData,
               insightData: result.insightData,
@@ -596,7 +684,8 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
           'concall': 'Earnings Call Analysis',
           'quarterly_result': 'Quarterly Results',
           'red_flags': 'Forensic Red Flags',
-          'supply_chain': 'Supply Chain Map'
+          'supply_chain': 'Supply Chain Map',
+          'ceo_lie_detector': 'CEO Lie Detector'
       };
 
       updateActiveTab({ 
@@ -612,7 +701,7 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
       });
 
       try {
-          const { text, thoughts, sentiment, chartData, bingoData, dominoData, sourceDocument } = await analyzeDocument(ticker, docType);
+          const { text, thoughts, sentiment, chartData, bingoData, dominoData, sourceDocument, sources, followUp } = await analyzeDocument(ticker, docType);
           
           setTabs(prev => prev.map(t => {
               if (t.id === activeTabId) {
@@ -633,6 +722,8 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                           sentimentScore: sentiment,
                           chartData,
                           dominoData,
+                          sources,
+                          followUp,
                           timestamp: Date.now()
                       }]
                   }
@@ -730,7 +821,7 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                         
                         {/* New Retail Friendly Workflow Selector */}
                         <div className="w-full">
-                            <h4 className="text-xs font-bold text-theme-muted uppercase tracking-wider mb-2">Quick Actions</h4>
+                            <h4 className="text-xs font-bold text-theme-muted uppercase tracking-wider mb-2">Financial War Room</h4>
                             <WorkflowSelector onSelect={(t) => setActiveWizard(t)} />
                         </div>
                     </div>
@@ -763,6 +854,9 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                                             </ReactMarkdown>
                                          </div>
 
+                                         {/* Citations / Sources */}
+                                         {msg.sources && msg.sources.length > 0 && <SourceChips sources={msg.sources} />}
+
                                          {/* Dynamic Widgets */}
                                          {msg.chartData && <DynamicChart data={msg.chartData} />}
                                          {msg.dominoData && <DominoGraph data={msg.dominoData} targetTicker="Target" />}
@@ -770,10 +864,18 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                                          
                                          {/* Sentiment Gauge */}
                                          {msg.sentimentScore !== undefined && (
-                                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-theme-surface border border-theme-border text-xs font-bold">
+                                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-theme-surface border border-theme-border text-xs font-bold mt-2">
                                                  <Activity size={12} className={msg.sentimentScore > 0 ? 'text-emerald-500' : 'text-rose-500'} />
                                                  Sentiment: <span className={msg.sentimentScore > 0 ? 'text-emerald-500' : 'text-rose-500'}>{msg.sentimentScore > 0 ? '+' : ''}{msg.sentimentScore}</span>
                                              </div>
+                                         )}
+
+                                         {/* Suggested Follow-Ups */}
+                                         {msg.followUp && msg.followUp.length > 0 && (
+                                             <FollowUpSuggestions 
+                                                questions={msg.followUp} 
+                                                onSelect={(q) => handleSendMessage(q)} 
+                                             />
                                          )}
                                      </div>
                                  ) : (
@@ -783,7 +885,7 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                          </div>
                     ))
                 )}
-                {loading && <LoadingIndicator avatarUrl={botAvatarUrl} />}
+                {loading && <ContextAwareLoading lastUserMessage={activeTab.messages.filter(m => m.role === 'user').pop()?.text} />}
                 
                 {/* Active Wizard Overlay */}
                 {activeWizard && (

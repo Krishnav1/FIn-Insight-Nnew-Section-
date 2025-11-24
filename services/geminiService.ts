@@ -1,6 +1,7 @@
 
+
 import { GoogleGenAI, Chat, Content, Modality } from "@google/genai";
-import { Article, PortfolioItem, ChatMessage, AnalysisResult, PortfolioAttributionResult, ConcentrationRiskResult, RippleEffectResult, ForensicAnalysisResult, DocumentType, BingoData, DominoData, PortfolioHealthReport, EarningsEvent, NewsInsight } from '../types';
+import { Article, PortfolioItem, ChatMessage, AnalysisResult, PortfolioAttributionResult, ConcentrationRiskResult, RippleEffectResult, ForensicAnalysisResult, DocumentType, BingoData, DominoData, PortfolioHealthReport, EarningsEvent, NewsInsight, SourceLink } from '../types';
 import { MOCK_ARTICLES } from '../constants';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -112,8 +113,6 @@ const parseAIResponse = (rawText: string) => {
   let text = rawText || "";
   
   // 1. Clean Accidental Object Stringification (Safety Check)
-  // Sometimes older React renderers might have injected this into chat history context passed back to LLM, 
-  // causing it to hallucinate it back. We strip it here.
   text = text.replace(/\[object Object\]/g, "");
 
   // 2. Extract Thoughts/Reasoning
@@ -164,23 +163,32 @@ const parseAIResponse = (rawText: string) => {
       text = text.replace(insightExtraction.fullMatch, '').trim();
   }
 
-  // 8. Extract Suggestions
-  const suggestions: string[] = [];
-  const suggestionRegex = /\[SUGGESTION:\s*(.*?)\]/g;
-  let match;
-  while ((match = suggestionRegex.exec(text)) !== null) {
-    suggestions.push(match[1].trim());
+  // 8. Extract Sources
+  let sources: SourceLink[] | undefined = undefined;
+  const sourcesExtraction = extractJsonBlock(text, '[SOURCES:');
+  if (sourcesExtraction) {
+      sources = sourcesExtraction.json;
+      text = text.replace(sourcesExtraction.fullMatch, '').trim();
   }
-  text = text.replace(suggestionRegex, '').trim();
+
+  // 9. Extract Follow Ups
+  let followUp: string[] | undefined = undefined;
+  const followUpExtraction = extractJsonBlock(text, '[FOLLOW_UP:');
+  if (followUpExtraction) {
+      followUp = followUpExtraction.json;
+      text = text.replace(followUpExtraction.fullMatch, '').trim();
+  }
   
   // Cleanup
   text = text.replace(/\[CHART_DATA:[\s\S]*?\]/g, ''); 
   text = text.replace(/\[DOMINO_DATA:[\s\S]*?\]/g, '');
   text = text.replace(/\[INSIGHT_DATA:[\s\S]*?\]/g, '');
+  text = text.replace(/\[SOURCES:[\s\S]*?\]/g, '');
+  text = text.replace(/\[FOLLOW_UP:[\s\S]*?\]/g, '');
   text = text.replace(/\[THOUGHTS\][\s\S]*?\[\/THOUGHTS\]/g, '');
   text = text.replace(/\n\s*\n/g, '\n\n').trim();
 
-  return { text, thoughts, sentiment, chartData, bingoData, dominoData, insightData, suggestions };
+  return { text, thoughts, sentiment, chartData, bingoData, dominoData, insightData, sources, followUp };
 };
 
 export const fetchLiveNews = async (): Promise<Article[]> => {
@@ -240,21 +248,35 @@ export const startChatSession = (article: Article | null, portfolio: PortfolioIt
   `;
   
   const reasoningInstruction = `
-        REASONING RULE:
-        Start your response with [THOUGHTS] 1. Analyzing query... 2. Checking facts... [/THOUGHTS]
+        THINKING RULE (FIRST PRINCIPLES):
+        Before answering, you MUST start with [THOUGHTS].
+        Inside thoughts, break down the query:
+        1. Identify the core financial question.
+        2. List the data points needed (P/E, Debt, Growth).
+        3. Verify against logic (e.g., if Revenue is up but Cash Flow is down, flag it).
+        4. Check for contradictions in sentiment.
+        [/THOUGHTS]
+  `;
+
+  const followUpInstruction = `
+        ENGAGEMENT RULE:
+        At the end of your response, you MUST provide:
+        1. [SOURCES: [{"title": "Source Name", "url": "URL"}]] (If you used Google Search).
+        2. [FOLLOW_UP: ["Question 1?", "Question 2?", "Question 3?"]] (3 specific, deep-dive questions for the user to ask next).
   `;
 
   const systemInstruction = `
-        You are FinGenie, a friendly and smart Financial Assistant for Retail Investors.
+        You are FinGenie, a "Wall Street Grade" AI Analyst for Retail Investors.
         USER PORTFOLIO: ${portfolioString}
         
-        TONE: Simple, clear, helpful. Avoid overly complex jargon. If you use a hard term, explain it.
+        TONE: Professional, Insightful, "No Fluff". Use First Principles thinking.
         
         OUTPUT RULES: 
         1. **Reasoning**: ${reasoningInstruction}
         2. **Formatting**: Use **Bold** for key insights. Use bullet points.
-        3. **Visuals**: ${chartInstruction}
-        4. **Tags**: End with [SENTIMENT: score]
+        3. **Engagement**: ${followUpInstruction}
+        4. **Visuals**: ${chartInstruction}
+        5. **Tags**: End with [SENTIMENT: score] (-100 to 100).
   `;
 
   let chatHistory: Content[] | undefined;
@@ -277,7 +299,7 @@ export const startChatSession = (article: Article | null, portfolio: PortfolioIt
   return currentChatSession;
 };
 
-export const sendChatMessage = async (message: string): Promise<{ text: string; thoughts?: string; sentiment?: number; suggestions?: string[]; chartData?: any; dominoData?: DominoData; insightData?: NewsInsight }> => {
+export const sendChatMessage = async (message: string): Promise<{ text: string; thoughts?: string; sentiment?: number; suggestions?: string[]; sources?: SourceLink[]; followUp?: string[]; chartData?: any; dominoData?: DominoData; insightData?: NewsInsight }> => {
   if (!currentChatSession) throw new Error("Chat session not initialized");
   
   try {
@@ -289,8 +311,6 @@ export const sendChatMessage = async (message: string): Promise<{ text: string; 
 };
 
 export const getInitialPrompt = (action: string): string => {
-   // These are largely replaced by the specific Workflow Wizards now, 
-   // but kept for the "Quick Actions" on news cards.
    switch (action) {
     case 'summary': return `Summarize this in simple terms. What does it mean for a regular investor?`;
     case 'impact': return "How does this news impact my portfolio stocks? Be specific.";
@@ -334,16 +354,17 @@ export const analyzeForensicDocument = async (text: string): Promise<ForensicAna
     return null; // Stub
 };
 
-export const analyzeDocument = async (ticker: string, docType: DocumentType): Promise<{text: string, thoughts?: string, sentiment: number, chartData?: any, sourceDocument?: string, bingoData?: BingoData, dominoData?: DominoData}> => {
+export const analyzeDocument = async (ticker: string, docType: DocumentType): Promise<{text: string, thoughts?: string, sentiment: number, chartData?: any, sourceDocument?: string, bingoData?: BingoData, dominoData?: DominoData, sources?: SourceLink[], followUp?: string[]}> => {
   const simulatedSourceDoc = `Simulated ${docType} for ${ticker}... Revenue up, margins stable. Management optimistic.`;
   
   const prompt = `
     Analyze this ${docType} for ${ticker} for a RETAIL investor.
-    Keep it simple.
+    Keep it simple but deep.
     Source: "${simulatedSourceDoc}"
     
     Start with [THOUGHTS]...[/THOUGHTS].
     End with [SENTIMENT: 50].
+    Add [FOLLOW_UP: ["Q1", "Q2", "Q3"]].
   `;
 
    try {
@@ -357,6 +378,10 @@ export const analyzeDocument = async (ticker: string, docType: DocumentType): Pr
             text: result.text,
             thoughts: result.thoughts,
             sentiment: result.sentiment || 0,
+            chartData: result.chartData,
+            dominoData: result.dominoData,
+            sources: result.sources,
+            followUp: result.followUp,
             sourceDocument: simulatedSourceDoc
         };
    } catch (e) {

@@ -8,11 +8,23 @@ export enum LayoutMode {
 
 export type Theme = 'light' | 'dark' | 'midnight' | 'terminal' | 'ocean';
 
+export type AppView = 'landing' | 'workspace' | 'news' | 'portfolio';
+
+export interface User {
+  name: string;
+  email: string;
+  avatar?: string;
+}
+
 export interface PortfolioItem {
   symbol: string;
   name: string;
   shares: number;
   avgPrice: number;
+  currentPrice?: number; // Added for dashboard
+  sector?: string; // Added for dashboard
+  dayChange?: number; // Added for dashboard
+  type?: 'Stock' | 'Mutual Fund' | 'Gold' | 'Bond';
 }
 
 export interface Article {
@@ -30,7 +42,7 @@ export interface Article {
 
 export type AITaskType = 'summary' | 'impact' | 'eli5' | 'chat' | 'compare' | 'history' | 'bear-case' | 'jargon';
 
-export type DocumentType = 'annual_report' | 'concall' | 'quarterly_result' | 'red_flags' | 'supply_chain';
+export type DocumentType = 'annual_report' | 'concall' | 'quarterly_result' | 'red_flags' | 'supply_chain' | 'ceo_lie_detector';
 
 export interface TickerSearchItem {
   symbol: string;
@@ -133,6 +145,11 @@ export interface NewsInsight {
   };
 }
 
+export interface SourceLink {
+    title: string;
+    url: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: Role;
@@ -140,6 +157,8 @@ export interface ChatMessage {
   thoughts?: string; // New: Internal monologue/reasoning steps
   sentimentScore?: number; // -100 (Bearish) to 100 (Bullish)
   suggestions?: string[]; // Dynamic follow-up questions
+  sources?: SourceLink[]; // New: Citations
+  followUp?: string[]; // New: Specific follow up questions
   chartData?: ChartData; // Optional JSON for dynamic charts (Recharts)
   dominoData?: DominoData; // Optional JSON for Supply Chain Graph
   portfolioReport?: PortfolioHealthReport; // Optional JSON for Portfolio Dashboard

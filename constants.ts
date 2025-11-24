@@ -1,4 +1,5 @@
 
+
 import { Article, PortfolioItem, TickerSearchItem } from './types';
 
 export const USER_PORTFOLIO: PortfolioItem[] = [
@@ -7,6 +8,16 @@ export const USER_PORTFOLIO: PortfolioItem[] = [
   { symbol: 'HDFCBANK', name: 'HDFC Bank', shares: 100, avgPrice: 1500 },
   { symbol: 'INFY', name: 'Infosys', shares: 45, avgPrice: 1450 },
   { symbol: 'TATAMOTORS', name: 'Tata Motors', shares: 200, avgPrice: 600 },
+];
+
+export const MOCK_DETAILED_PORTFOLIO: PortfolioItem[] = [
+  { symbol: 'RELIANCE', name: 'Reliance Industries', shares: 50, avgPrice: 2400, currentPrice: 2950, sector: 'Energy', dayChange: 1.2, type: 'Stock' },
+  { symbol: 'TCS', name: 'Tata Consultancy Services', shares: 30, avgPrice: 3500, currentPrice: 4100, sector: 'Technology', dayChange: -0.5, type: 'Stock' },
+  { symbol: 'HDFCBANK', name: 'HDFC Bank', shares: 100, avgPrice: 1500, currentPrice: 1440, sector: 'Finance', dayChange: 0.8, type: 'Stock' },
+  { symbol: 'INFY', name: 'Infosys', shares: 45, avgPrice: 1450, currentPrice: 1600, sector: 'Technology', dayChange: -0.2, type: 'Stock' },
+  { symbol: 'TATAMOTORS', name: 'Tata Motors', shares: 200, avgPrice: 600, currentPrice: 980, sector: 'Automotive', dayChange: 2.1, type: 'Stock' },
+  { symbol: 'NIFTYBEES', name: 'Nippon India ETF Nifty BeES', shares: 500, avgPrice: 210, currentPrice: 245, sector: 'ETF', dayChange: 0.4, type: 'Mutual Fund' },
+  { symbol: 'GOLDBEES', name: 'Nippon India ETF Gold BeES', shares: 100, avgPrice: 45, currentPrice: 58, sector: 'Commodity', dayChange: 0.1, type: 'Gold' }
 ];
 
 export const SEARCHABLE_TICKERS: TickerSearchItem[] = [
