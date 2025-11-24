@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Chat, Content, Modality } from "@google/genai";
-import { Article, PortfolioItem, ChatMessage, AnalysisResult, PortfolioAttributionResult, ConcentrationRiskResult, RippleEffectResult, ForensicAnalysisResult, DocumentType, BingoData, DominoData, PortfolioHealthReport, EarningsEvent } from '../types';
+import { Article, PortfolioItem, ChatMessage, AnalysisResult, PortfolioAttributionResult, ConcentrationRiskResult, RippleEffectResult, ForensicAnalysisResult, DocumentType, BingoData, DominoData, PortfolioHealthReport, EarningsEvent, NewsInsight } from '../types';
 import { MOCK_ARTICLES } from '../constants';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -24,6 +24,13 @@ const cleanJsonString = (str: string): string => {
 
     // Fix empty value error (e.g. "key": } -> "key": null })
     cleaned = cleaned.replace(/:\s*([}\]])/g, ': null$1');
+
+    // Fix single quotes for keys (e.g. 'key': "value" -> "key": "value")
+    cleaned = cleaned.replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":');
+
+    // Fix single quotes for string values (e.g. "key": 'value' -> "key": "value")
+    // This is a simple heuristic and might not catch complex cases with escaped quotes
+    cleaned = cleaned.replace(/:\s*'([^']*)'/g, ': "$1"');
     
     return cleaned;
 };
@@ -121,7 +128,7 @@ const extractJsonBlock = (text: string, tag: string): { json: any, fullMatch: st
 
 /**
  * Helper to parse AI response text and extract structured data tags.
- * Handles: [SENTIMENT], [CHART_DATA], [SUGGESTION], [BINGO_DATA], [DOMINO_DATA]
+ * Handles: [SENTIMENT], [CHART_DATA], [SUGGESTION], [BINGO_DATA], [DOMINO_DATA], [INSIGHT_DATA]
  */
 const parseAIResponse = (rawText: string) => {
   let text = rawText || "";
@@ -158,7 +165,15 @@ const parseAIResponse = (rawText: string) => {
       text = text.replace(dominoExtraction.fullMatch, '').trim();
   }
 
-  // 5. Extract Suggestions
+  // 5. Extract News Insight Data
+  let insightData: NewsInsight | undefined = undefined;
+  const insightExtraction = extractJsonBlock(text, '[INSIGHT_DATA:');
+  if (insightExtraction) {
+      insightData = insightExtraction.json;
+      text = text.replace(insightExtraction.fullMatch, '').trim();
+  }
+
+  // 6. Extract Suggestions
   const suggestions: string[] = [];
   const suggestionRegex = /\[SUGGESTION:\s*(.*?)\]/g;
   let match;
@@ -170,9 +185,10 @@ const parseAIResponse = (rawText: string) => {
   // Cleanup extra newlines and lingering tag artifacts if extraction failed partially
   text = text.replace(/\[CHART_DATA:[\s\S]*?\]/g, ''); // Fallback cleanup
   text = text.replace(/\[DOMINO_DATA:[\s\S]*?\]/g, '');
+  text = text.replace(/\[INSIGHT_DATA:[\s\S]*?\]/g, '');
   text = text.replace(/\n\s*\n/g, '\n\n').trim();
 
-  return { text, sentiment, chartData, bingoData, dominoData, suggestions };
+  return { text, sentiment, chartData, bingoData, dominoData, insightData, suggestions };
 };
 
 /**
@@ -258,7 +274,7 @@ export const startChatSession = (article: Article | null, portfolio: PortfolioIt
         If the user asks about growth rates, comparisons between companies, financial results, or trends, you MUST generate a chart.
         Use the [CHART_DATA] tag at the very end of your response.
         
-        CHART FORMATS:
+        CHART FORMATS (STRICT JSON, Double Quotes Only):
         1. Standard: [CHART_DATA: { "title": "...", "type": "bar", "labels": ["A","B"], "datasets": [{"label":"Metric","data":[10,20]}] }]
         2. Simplified: [CHART_DATA: { "title": "...", "type": "bar", "data": [{"label": "A", "value": 10}, {"label": "B", "value": 20}] }]
   `;
@@ -319,7 +335,7 @@ export const startChatSession = (article: Article | null, portfolio: PortfolioIt
   return currentChatSession;
 };
 
-export const sendChatMessage = async (message: string): Promise<{ text: string; sentiment?: number; suggestions?: string[]; chartData?: any; dominoData?: DominoData }> => {
+export const sendChatMessage = async (message: string): Promise<{ text: string; sentiment?: number; suggestions?: string[]; chartData?: any; dominoData?: DominoData; insightData?: NewsInsight }> => {
   if (!currentChatSession) throw new Error("Chat session not initialized");
   
   const runAttempt = async () => {
@@ -348,7 +364,25 @@ export const sendChatMessage = async (message: string): Promise<{ text: string; 
 
 export const getInitialPrompt = (action: string): string => {
    switch (action) {
-    case 'summary': return "Give me a concise 3-bullet summary of this article using structured Markdown.";
+    case 'summary': return `
+        Analyze this article and provide a comprehensive Structured Insight Card.
+        
+        INSTRUCTIONS:
+        1. First, provide a natural language summary (2-3 sentences) explaining the core event and its significance.
+        2. Then, generate a [INSIGHT_DATA] block at the VERY END.
+        
+        [INSIGHT_DATA] SCHEMA (STRICT JSON):
+        [INSIGHT_DATA: {
+            "gist": "A single punchy sentence summarizing the event.",
+            "stats": [{"label": "Revenue", "value": "₹50Cr"}, {"label": "YoY Growth", "value": "+12%"}], 
+            "outlook": "One sentence on what happens next (e.g., 'Stock likely to rally').",
+            "hypeScore": 20,
+            "impact": { 
+                "beneficiaries": ["Ticker1", "Sector2"], 
+                "negativelyImpacted": ["Ticker3"] 
+            }
+        }]
+    `;
     case 'impact': return "Analyze the impact of this news on my specific portfolio holdings. Use bullet points for risks and opportunities.";
     case 'eli5': return "Explain this news story to me like I'm a 5-year-old using a fun analogy. Use bold text for key terms.";
     case 'compare': return "Create a markdown comparison table between the companies mentioned. Then, generate a [CHART_DATA] block comparing key metrics visually.";

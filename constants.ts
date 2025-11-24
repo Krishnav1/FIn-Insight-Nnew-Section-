@@ -1,3 +1,4 @@
+
 import { Article, PortfolioItem, TickerSearchItem } from './types';
 
 export const USER_PORTFOLIO: PortfolioItem[] = [
@@ -28,6 +29,27 @@ export const SEARCHABLE_TICKERS: TickerSearchItem[] = [
   { symbol: 'PAYTM', name: 'One97 Communications', type: 'Stock' },
   { symbol: 'ADANIENT', name: 'Adani Enterprises', type: 'Stock' },
   { symbol: 'ADANIPORTS', name: 'Adani Ports', type: 'Stock' },
+];
+
+export const MACROS: TickerSearchItem[] = [
+  { symbol: 'IT', name: 'Information Technology Sector', type: 'Sector' },
+  { symbol: 'BANKING', name: 'Banking & Finance Sector', type: 'Sector' },
+  { symbol: 'AUTO', name: 'Automobile Sector', type: 'Sector' },
+  { symbol: 'FMCG', name: 'Consumer Goods Sector', type: 'Sector' },
+  { symbol: 'CRUDEOIL', name: 'Brent Crude Oil', type: 'Commodity' },
+  { symbol: 'GOLD', name: 'Gold Prices', type: 'Commodity' },
+  { symbol: 'USDINR', name: 'USD to INR Exchange Rate', type: 'Forex' },
+  { symbol: 'INFLATION', name: 'India CPI Inflation', type: 'Macro' },
+  { symbol: 'REPO', name: 'RBI Repo Rate', type: 'Macro' },
+  { symbol: 'BUDGET', name: 'Union Budget', type: 'Event' },
+];
+
+export const COMMANDS: TickerSearchItem[] = [
+  { symbol: 'portfolio', name: 'Check Portfolio Health', type: 'Command', description: 'Run attribution & risk analysis' },
+  { symbol: 'compare', name: 'Compare two stocks', type: 'Command', description: 'Launch War Room comparison' },
+  { symbol: 'simulate', name: 'Ripple Effect Simulator', type: 'Command', description: 'Simulate macro events' },
+  { symbol: 'screen', name: 'Stock Screener', type: 'Command', description: 'Find stocks with natural language' },
+  { symbol: 'alert', name: 'Set Price Alert', type: 'Command', description: 'Notify when price hits target' },
 ];
 
 export const MOCK_ARTICLES: Article[] = [

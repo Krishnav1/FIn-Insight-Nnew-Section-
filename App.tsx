@@ -117,7 +117,7 @@ const App: React.FC = () => {
     return articles
       .filter(a => 
         a.id !== viewArticle.id && 
-        (a.category === viewArticle.category || a.relatedTickers.some(t => viewArticle.relatedTickers.includes(t)))
+        (a.category === viewArticle.category || a.relatedTickers.some(t => viewArticle.relatedTickers?.includes(t)))
       )
       .slice(0, 4);
   }, [viewArticle, articles]);
@@ -258,20 +258,29 @@ const App: React.FC = () => {
     }
 
     // For specific actions (summary, impact, eli5, history, bear-case, jargon, compare)
-    if (isSameArticle && chatMessages.length > 0) {
-        const prompt = getInitialPrompt(action as any);
-        await sendMessage(prompt);
-        return;
-    }
+    // We want the user to see a simple message like "Summarize this" but send the complex prompt to AI
+    const displayTexts: Record<string, string> = {
+        'summary': "Summarize this article for me.",
+        'impact': "How does this affect my portfolio?",
+        'eli5': "Explain this like I'm 5.",
+        'compare': "Compare the companies mentioned.",
+        'history': "Has this happened before?",
+        'bear-case': "Play Devil's Advocate.",
+        'jargon': "Explain the jargon."
+    };
+
+    const displayMessage = displayTexts[action] || "Analyze this.";
+    const complexPrompt = getInitialPrompt(action as any);
 
     // New article selected or fresh session
     if (!isSameArticle || chatMessages.length === 0) {
         setSelectedArticle(article);
         setChatMessages([]); // Clear old chat
         startChatSession(article, USER_PORTFOLIO);
-        
-        const initialPrompt = getInitialPrompt(action as any);
-        await sendMessage(initialPrompt);
+        await sendMessage(displayMessage, complexPrompt);
+    } else {
+        // Existing session
+        await sendMessage(displayMessage, complexPrompt);
     }
   };
 
@@ -292,19 +301,22 @@ const App: React.FC = () => {
     }));
   };
 
-  const sendMessage = async (text: string) => {
+  const sendMessage = async (text: string, apiPromptOverride?: string) => {
     const userMsg: ChatMessage = {
         id: Date.now().toString(),
         role: 'user',
-        text: text,
+        text: text, // Display text shown in UI
         timestamp: Date.now()
     };
     
     setChatMessages(prev => [...prev, userMsg]);
     setAiLoading(true);
 
+    // Use the override if provided, otherwise the user text
+    const promptToSend = apiPromptOverride || text;
+
     // Intercept /portfolio command logic for dashboard chat
-    if (text.toLowerCase().includes('/portfolio') || text.toLowerCase() === 'check portfolio health') {
+    if (promptToSend.toLowerCase().includes('/portfolio') || promptToSend.toLowerCase() === 'check portfolio health') {
         try {
             const fetchedNews = await fetchLiveNews();
             const report = await getPortfolioHealthReport(USER_PORTFOLIO, fetchedNews || []);
@@ -327,7 +339,7 @@ const App: React.FC = () => {
         }
     }
 
-    const result = await sendChatMessage(text);
+    const result = await sendChatMessage(promptToSend);
 
     const aiMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -337,6 +349,7 @@ const App: React.FC = () => {
         suggestions: result.suggestions,
         chartData: result.chartData,
         dominoData: result.dominoData,
+        insightData: result.insightData,
         timestamp: Date.now()
     };
 

@@ -49,17 +49,17 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ data }) => {
                 <div>
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Portfolio Sentiment</h3>
                     <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-2xl font-black ${attribution.overallSentiment === 'Bullish' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {attribution.overallSentiment}
+                        <span className={`text-2xl font-black ${attribution?.overallSentiment === 'Bullish' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            {attribution?.overallSentiment || 'Neutral'}
                         </span>
                         <span className="text-sm font-mono bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-gray-700 dark:text-gray-300">
-                            {attribution.movementPercentageEstimate}
+                            {attribution?.movementPercentageEstimate || '0%'}
                         </span>
                     </div>
                 </div>
                 <div className="text-right max-w-[50%]">
                     <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
-                        "{attribution.verdict}"
+                        "{attribution?.verdict}"
                     </p>
                 </div>
             </div>
@@ -68,7 +68,7 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ data }) => {
                 {/* Culprits */}
                 <div className="bg-rose-50 dark:bg-rose-900/10 rounded-xl p-3 border border-rose-100 dark:border-rose-800/30">
                     <h4 className="text-[10px] font-bold text-rose-600 uppercase mb-2 flex items-center gap-1"><TrendingDown size={12}/> Dragging Down</h4>
-                    {attribution.culprits.slice(0, 2).map((c, i) => (
+                    {(attribution?.culprits || []).slice(0, 2).map((c, i) => (
                         <div key={i} className="mb-2 last:mb-0">
                             <div className="flex justify-between items-center">
                                 <span className="font-bold text-sm text-gray-800 dark:text-gray-200">{c.ticker}</span>
@@ -77,13 +77,13 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ data }) => {
                             <p className="text-[10px] text-gray-500 line-clamp-1">{c.reason}</p>
                         </div>
                     ))}
-                    {attribution.culprits.length === 0 && <span className="text-xs text-gray-400 italic">None</span>}
+                    {(!attribution?.culprits || attribution.culprits.length === 0) && <span className="text-xs text-gray-400 italic">None</span>}
                 </div>
 
                 {/* Saviors */}
                 <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-xl p-3 border border-emerald-100 dark:border-emerald-800/30">
                     <h4 className="text-[10px] font-bold text-emerald-600 uppercase mb-2 flex items-center gap-1"><TrendingUp size={12}/> Lifting Up</h4>
-                    {attribution.saviors.slice(0, 2).map((s, i) => (
+                    {(attribution?.saviors || []).slice(0, 2).map((s, i) => (
                         <div key={i} className="mb-2 last:mb-0">
                             <div className="flex justify-between items-center">
                                 <span className="font-bold text-sm text-gray-800 dark:text-gray-200">{s.ticker}</span>
@@ -92,14 +92,14 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ data }) => {
                             <p className="text-[10px] text-gray-500 line-clamp-1">{s.reason}</p>
                         </div>
                     ))}
-                    {attribution.saviors.length === 0 && <span className="text-xs text-gray-400 italic">None</span>}
+                    {(!attribution?.saviors || attribution.saviors.length === 0) && <span className="text-xs text-gray-400 italic">None</span>}
                 </div>
             </div>
           </div>
         )}
 
         {/* TAB 2: RISK RADAR */}
-        {activeTab === 'risk' && (
+        {activeTab === 'risk' && risk && (
             <div className="animate-fade-in flex flex-col items-center text-center">
                 <div className={`w-24 h-24 rounded-full flex items-center justify-center border-[6px] mb-3 transition-colors ${
                      risk.riskLevel === 'High' ? 'border-red-500 text-red-500' : 
@@ -115,7 +115,7 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ data }) => {
 
                 <div className="w-full bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-left">
                     <h5 className="text-[10px] font-bold text-gray-400 uppercase mb-2">Identified Vulnerabilities</h5>
-                    {risk.risks.map((r, i) => (
+                    {(risk.risks || []).map((r, i) => (
                         <div key={i} className="flex items-center justify-between mb-2 last:mb-0 text-sm">
                             <span className="text-gray-700 dark:text-gray-300">{r.factor}</span>
                             <span className="font-mono font-bold text-gray-500">{r.percentageExposure}</span>
@@ -134,11 +134,11 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ data }) => {
         {activeTab === 'calendar' && (
             <div className="animate-fade-in">
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Upcoming 30 Days</h3>
-                {earnings.length === 0 ? (
+                {(!earnings || earnings.length === 0) ? (
                     <p className="text-sm text-gray-500 italic">No major earnings events projected soon.</p>
                 ) : (
                     <div className="space-y-3">
-                        {earnings.map((e, i) => (
+                        {(earnings || []).map((e, i) => (
                             <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700/30 rounded-xl border border-gray-100 dark:border-gray-700 hover:border-blue-300 transition-colors group cursor-default">
                                 <div className="flex-shrink-0 w-12 text-center">
                                     <div className="text-[10px] text-gray-400 uppercase">Date</div>

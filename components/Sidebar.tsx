@@ -1,25 +1,152 @@
+
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { X, Send, TrendingUp, TrendingDown, Minus, Copy, ThumbsUp, ThumbsDown, Check, MessageCircle, FileText, Search, AlertOctagon, PieChart, Phone, Factory, Pin } from 'lucide-react';
-import { Article, ChatMessage, TickerSearchItem, DocumentType, PinnedItem } from '../types';
-import { SEARCHABLE_TICKERS } from '../constants';
+import { X, Send, TrendingUp, TrendingDown, Minus, Copy, ThumbsUp, ThumbsDown, Check, MessageCircle, FileText, Search, AlertOctagon, PieChart, Phone, Factory, Pin, Zap, Target, ArrowRight, Activity, AlertTriangle } from 'lucide-react';
+import { Article, ChatMessage, TickerSearchItem, DocumentType, PinnedItem, NewsInsight } from '../types';
+import { SEARCHABLE_TICKERS, MACROS, COMMANDS } from '../constants';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import DynamicChart from './DynamicChart';
 import DominoGraph from './DominoGraph';
 import PortfolioWidget from './PortfolioWidget';
 import TickerChip from './TickerChip';
+import QuickPeekDrawer from './QuickPeekDrawer';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   selectedArticle: Article | null;
   messages: ChatMessage[];
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, apiPrompt?: string) => void;
   loading: boolean;
   botAvatarUrl: string;
   onFeedback: (messageId: string, type: 'liked' | 'disliked') => void;
   onSmartAction: (ticker: string, docType: DocumentType) => void;
 }
+
+const SidebarLoadingIndicator = () => {
+  const [textIndex, setTextIndex] = useState(0);
+  const texts = [
+    "Reading Article...",
+    "Scanning for Red Flags...",
+    "Analyzing Sentiment...",
+    "Cross-referencing sources...",
+    "Generating Chart...",
+    "Synthesizing Insights..."
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTextIndex((prev) => (prev + 1) % texts.length);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex justify-start animate-slide-up">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-3">
+            <div className="flex items-center gap-1">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce delay-75"></div>
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce delay-150"></div>
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium min-w-[140px] transition-all duration-300">
+                {texts[textIndex]}
+            </span>
+        </div>
+    </div>
+  );
+};
+
+const SmartInsightCard = ({ data }: { data: NewsInsight }) => {
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mt-4 mb-6 animate-fade-in">
+            {/* Header - The Gist */}
+            <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/20">
+                <div className="flex items-center gap-2 mb-2">
+                    <div className="p-1.5 bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 rounded-full">
+                        <Target size={16} />
+                    </div>
+                    <h4 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">The Gist</h4>
+                </div>
+                <p className="text-sm font-bold text-gray-900 dark:text-white leading-tight">
+                    {data.gist}
+                </p>
+            </div>
+
+            {/* Key Numbers Grid */}
+            {data.stats && data.stats.length > 0 && (
+                <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700 border-b border-gray-100 dark:border-gray-700">
+                    {data.stats.map((stat, i) => (
+                        <div key={i} className="bg-white dark:bg-gray-800 p-3 text-center">
+                            <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-medium">{stat.label}</div>
+                            <div className="text-lg font-bold text-gray-800 dark:text-gray-100 mt-0.5 font-mono">{stat.value}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Impact Pills - Winners & Losers */}
+            <div className="grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-700">
+                <div className="p-4 bg-emerald-50/50 dark:bg-emerald-900/10">
+                    <h5 className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase mb-2 flex items-center gap-1">
+                        <TrendingUp size={12}/> Beneficiaries
+                    </h5>
+                    <div className="flex flex-wrap gap-1.5">
+                        {data.impact.beneficiaries.length > 0 ? (
+                            data.impact.beneficiaries.map((t, i) => (
+                                <span key={i} className="text-[10px] font-bold bg-white dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded border border-emerald-100 dark:border-emerald-800 shadow-sm">
+                                    {t}
+                                </span>
+                            ))
+                        ) : (
+                            <span className="text-[10px] text-gray-400 italic">None identified</span>
+                        )}
+                    </div>
+                </div>
+                <div className="p-4 bg-rose-50/50 dark:bg-rose-900/10">
+                    <h5 className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase mb-2 flex items-center gap-1">
+                        <TrendingDown size={12}/> Negative Impact
+                    </h5>
+                    <div className="flex flex-wrap gap-1.5">
+                        {data.impact.negativelyImpacted.length > 0 ? (
+                            data.impact.negativelyImpacted.map((t, i) => (
+                                <span key={i} className="text-[10px] font-bold bg-white dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-2 py-1 rounded border border-rose-100 dark:border-rose-800 shadow-sm">
+                                    {t}
+                                </span>
+                            ))
+                        ) : (
+                            <span className="text-[10px] text-gray-400 italic">None identified</span>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Outlook & Hype Meter */}
+            <div className="p-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex justify-between items-start mb-3">
+                    <div>
+                        <h5 className="text-[10px] font-bold text-gray-400 uppercase mb-1 flex items-center gap-1"><Zap size={12}/> Outlook</h5>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 font-medium">{data.outlook}</p>
+                    </div>
+                </div>
+                
+                {/* Hype vs Reality Meter */}
+                <div className="mt-3">
+                    <div className="flex justify-between text-[9px] font-bold text-gray-400 uppercase mb-1">
+                        <span>Hype vs Reality</span>
+                        <span className={data.hypeScore > 70 ? "text-rose-500" : "text-emerald-500"}>{data.hypeScore > 70 ? "High Hype" : "Balanced"}</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div 
+                            className={`h-full rounded-full ${data.hypeScore > 70 ? 'bg-rose-500' : data.hypeScore > 40 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
+                            style={{ width: `${data.hypeScore}%` }}
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const Sidebar: React.FC<SidebarProps> = ({ 
   isOpen, 
@@ -40,8 +167,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [cursorIndex, setCursorIndex] = useState(0);
+  const [triggerType, setTriggerType] = useState<'@' | '#' | '/' | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<TickerSearchItem | null>(null);
   const [showIntentMenu, setShowIntentMenu] = useState(false);
+  
+  // Living Tickers State
+  const [quickPeekTicker, setQuickPeekTicker] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -69,46 +200,75 @@ const Sidebar: React.FC<SidebarProps> = ({
       const cursorPos = e.target.selectionStart || 0;
       setCursorIndex(cursorPos);
 
-      // Detect @ mention
-      const lastAtPos = val.lastIndexOf('@', cursorPos - 1);
-      if (lastAtPos !== -1) {
-          const query = val.substring(lastAtPos + 1, cursorPos);
-          // Only show if query doesn't contain spaces (or is short)
-          if (!query.includes(' ')) {
-              setMentionQuery(query);
-              setShowSuggestions(true);
-              return;
-          }
+      const textBeforeCursor = val.substring(0, cursorPos);
+      const words = textBeforeCursor.split(/\s+/);
+      const currentWord = words[words.length - 1];
+
+      if (currentWord.startsWith('@')) {
+          setTriggerType('@');
+          setMentionQuery(currentWord.substring(1));
+          setShowSuggestions(true);
+      } else if (currentWord.startsWith('#')) {
+          setTriggerType('#');
+          setMentionQuery(currentWord.substring(1));
+          setShowSuggestions(true);
+      } else if (currentWord.startsWith('/') && words.length === 1) {
+          setTriggerType('/');
+          setMentionQuery(currentWord.substring(1));
+          setShowSuggestions(true);
+      } else {
+          setShowSuggestions(false);
+          setTriggerType(null);
       }
-      
-      setShowSuggestions(false);
-      setMentionQuery(null);
   };
 
   const filteredSuggestions = useMemo(() => {
-      if (!mentionQuery) return [];
+      if (!mentionQuery && mentionQuery !== '') return [];
       const q = mentionQuery.toLowerCase();
-      return SEARCHABLE_TICKERS.filter(t => 
-          t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)
-      ).slice(0, 5); // Limit to 5
-  }, [mentionQuery]);
+      
+      let sourceList: TickerSearchItem[] = [];
+      if (triggerType === '@') sourceList = SEARCHABLE_TICKERS;
+      if (triggerType === '#') sourceList = MACROS;
+      if (triggerType === '/') sourceList = COMMANDS;
 
-  const handleSelectSuggestion = (ticker: TickerSearchItem) => {
+      return sourceList.filter(t => 
+          t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)
+      ).slice(0, 5);
+  }, [mentionQuery, triggerType]);
+
+  const handleSelectSuggestion = (item: TickerSearchItem) => {
       if (!inputRef.current) return;
       
       const val = inputValue;
-      const lastAtPos = val.lastIndexOf('@', cursorIndex - 1);
+      const textBeforeCursor = val.substring(0, cursorIndex);
+      const words = textBeforeCursor.split(/\s+/);
+      const lastWord = words[words.length - 1];
+      const startPos = textBeforeCursor.lastIndexOf(lastWord);
       
-      const newVal = val.substring(0, lastAtPos) + `@${ticker.symbol} ` + val.substring(cursorIndex);
+      if (triggerType === '/') {
+          // Commands
+          if (item.symbol === 'portfolio') {
+              onSendMessage("/portfolio");
+          } else {
+              setInputValue(`/${item.symbol} `);
+          }
+          setShowSuggestions(false);
+          return;
+      }
+
+      const prefix = triggerType || '';
+      const newVal = val.substring(0, startPos) + `${prefix}${item.symbol} ` + val.substring(cursorIndex);
+      
       setInputValue(newVal);
       setShowSuggestions(false);
       setMentionQuery(null);
       
-      // Trigger Intent Menu
-      setSelectedTicker(ticker);
-      setShowIntentMenu(true);
+      // Trigger Intent Menu only for stocks (@)
+      if (triggerType === '@') {
+          setSelectedTicker(item);
+          setShowIntentMenu(true);
+      }
       
-      // Reset focus
       inputRef.current.focus();
   };
 
@@ -201,6 +361,11 @@ const Sidebar: React.FC<SidebarProps> = ({
         aria-hidden="true"
       />
 
+      {/* Quick Peek Drawer (Stacked on top of Sidebar) */}
+      {quickPeekTicker && (
+          <QuickPeekDrawer ticker={quickPeekTicker} onClose={() => setQuickPeekTicker(null)} />
+      )}
+
       {/* Panel */}
       <div 
         className={`fixed inset-y-0 right-0 w-full sm:w-[450px] bg-white dark:bg-gray-800 shadow-2xl transform transition-transform duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] z-50 flex flex-col border-l border-transparent dark:border-gray-700 ${
@@ -258,16 +423,50 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <div className="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-sm px-4 py-4 shadow-sm border border-gray-200 dark:border-gray-700 text-sm relative group">
                     
                     <div className="prose dark:prose-invert prose-sm max-w-none mb-2">
-                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                         <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                                li: ({node, ...props}) => (
+                                    <li className="flex items-start gap-2.5 text-gray-700 dark:text-gray-300" {...props}>
+                                        <span className="mt-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
+                                        <span className="flex-1">
+                                            {React.Children.map(props.children, child => {
+                                                if (typeof child === 'string') {
+                                                    return <TickerChipWrapper text={child} onTickerClick={setQuickPeekTicker} />;
+                                                }
+                                                return child;
+                                            })}
+                                        </span>
+                                    </li>
+                                ),
+                                p: ({node, ...props}) => (
+                                    <p className="mb-4" {...props}>
+                                        {React.Children.map(props.children, child => {
+                                            if (typeof child === 'string') {
+                                                return <TickerChipWrapper text={child} onTickerClick={setQuickPeekTicker} />;
+                                            }
+                                            return child;
+                                        })}
+                                    </p>
+                                ),
+                            }}
+                         >
+                             {msg.text}
+                         </ReactMarkdown>
                     </div>
 
                     {/* Widgets */}
                     {msg.sentimentScore !== undefined && <SentimentGauge score={msg.sentimentScore} />}
                     
+                    {/* Structured News Insight */}
+                    {msg.insightData && (
+                        <SmartInsightCard data={msg.insightData} />
+                    )}
+
                     {msg.chartData && (
-                        <div className="mt-4 mb-2 h-64 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                         <div className="mt-4 mb-2">
                              <DynamicChart data={msg.chartData} />
-                        </div>
+                         </div>
                     )}
 
                     {msg.dominoData && (
@@ -331,17 +530,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           ))}
           
-          {loading && (
-            <div className="flex justify-start animate-pulse">
-                <div className="bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-sm border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
-                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce delay-75"></div>
-                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce delay-150"></div>
-                    </div>
-                </div>
-            </div>
-          )}
+          {loading && <SidebarLoadingIndicator />}
           <div ref={messagesEndRef} />
         </div>
 
@@ -380,8 +569,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                             className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-b border-gray-100 dark:border-gray-700 last:border-0 flex justify-between items-center group/item"
                         >
                             <div>
-                                <span className="block font-bold text-sm text-gray-800 dark:text-white group-hover/item:text-blue-600">{t.symbol}</span>
+                                <span className="block font-bold text-sm text-gray-800 dark:text-white group-hover/item:text-blue-600">
+                                    {triggerType === '#' ? '#' : triggerType === '/' ? '/' : ''}{t.symbol}
+                                </span>
                                 <span className="block text-xs text-gray-500">{t.name}</span>
+                                {t.description && <span className="block text-[10px] text-gray-400 italic truncate">{t.description}</span>}
                             </div>
                             <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded">{t.type}</span>
                         </button>
@@ -397,7 +589,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                         value={inputValue}
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
-                        placeholder="Ask a question... (Type @ for stock actions)"
+                        placeholder="Ask a question... (Type @ for stocks, # for macros, / for tools)"
                         className="w-full bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-xl pl-4 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder-gray-500"
                         disabled={loading}
                     />
@@ -418,5 +610,30 @@ const Sidebar: React.FC<SidebarProps> = ({
     </>
   );
 };
+
+// Helper component to parse text nodes and replace tickers with chips (Copied from FinGeniePage)
+const TickerChipWrapper = ({ text, onTickerClick }: { text: string; onTickerClick: (t: string) => void }) => {
+    const tickers = SEARCHABLE_TICKERS.map(t => t.symbol);
+    
+    const escapedTickers = tickers
+        .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .sort((a, b) => b.length - a.length);
+
+    if (escapedTickers.length === 0) return <>{text}</>;
+
+    const regex = new RegExp(`\\b(${escapedTickers.join('|')})\\b`, 'g');
+    const parts = text.split(regex);
+
+    return (
+        <>
+            {parts.map((part, i) => {
+                if (tickers.includes(part)) {
+                    return <TickerChip key={i} ticker={part} onClick={onTickerClick} />;
+                }
+                return part;
+            })}
+        </>
+    );
+}
 
 export default Sidebar;

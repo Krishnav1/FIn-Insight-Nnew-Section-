@@ -1,9 +1,9 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Plus, MessageSquare, Trash2, X, FileText, Phone, PieChart, AlertOctagon, ThumbsUp, ThumbsDown, Copy, Check, Pin, Layout, Download, Layers, Zap, Activity, Grid, Search, ZoomIn, ZoomOut, Factory, ArrowUpRight, Sparkles, ArrowRight, Lightbulb, Scale, ShieldAlert, Network, ChevronLeft, Briefcase, Menu } from 'lucide-react';
+import { Send, Plus, MessageSquare, Trash2, X, FileText, Phone, PieChart, AlertOctagon, ThumbsUp, ThumbsDown, Copy, Check, Pin, Layout, Download, Layers, Zap, Activity, Grid, Search, ZoomIn, ZoomOut, Factory, ArrowUpRight, Sparkles, ArrowRight, Lightbulb, Scale, ShieldAlert, Network, ChevronLeft, Briefcase, Menu, Command, Hash } from 'lucide-react';
 import { ChatMessage, TickerSearchItem, DocumentType, PinnedItem, EvidenceDocument, BingoData } from '../types';
 import { startChatSession, sendChatMessage, analyzeDocument, compareAnalysis, getPortfolioHealthReport } from '../services/geminiService';
-import { USER_PORTFOLIO, SEARCHABLE_TICKERS } from '../constants';
+import { USER_PORTFOLIO, SEARCHABLE_TICKERS, MACROS, COMMANDS } from '../constants';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import DynamicChart from './DynamicChart';
@@ -32,12 +32,12 @@ interface WorkspaceTab {
 const LoadingIndicator = ({ avatarUrl }: { avatarUrl: string }) => {
     const [textIndex, setTextIndex] = useState(0);
     const loadingTexts = [
-        "Processing request...",
-        "Reading document...",
-        "Analyzing financial data...",
+        "Reading Article...",
+        "Scanning for Red Flags...",
+        "Analyzing Sentiment...",
         "Cross-referencing sources...",
-        "Detecting patterns...",
-        "Generating insights..."
+        "Generating Chart...",
+        "Synthesizing Insights..."
     ];
 
     useEffect(() => {
@@ -109,7 +109,7 @@ const EarningsBingo = ({ data }: { data: BingoData }) => {
             <div className="mb-4">
                 <h5 className="text-[10px] font-bold text-gray-400 uppercase mb-2">Key Topics</h5>
                 <div className="flex flex-wrap gap-2">
-                    {data.wordCloud.map((w, i) => (
+                    {(data.wordCloud || []).map((w, i) => (
                         <span 
                         key={i} 
                         className={`px-3 py-1 rounded-full text-xs font-bold border transition-all hover:scale-105 cursor-default shadow-sm ${
@@ -130,7 +130,7 @@ const EarningsBingo = ({ data }: { data: BingoData }) => {
                 <div className="h-24 flex items-end gap-2 relative border-b border-gray-200 dark:border-slate-600 pb-1">
                     <div className="absolute top-1/2 w-full h-px bg-gray-300 dark:bg-slate-600 border-dashed opacity-50"></div>
                     
-                    {data.sentimentTimeline.map((pt, i) => {
+                    {(data.sentimentTimeline || []).map((pt, i) => {
                         const height = Math.abs(pt.sentiment);
                         const isPos = pt.sentiment >= 0;
                         return (
@@ -234,7 +234,7 @@ const EvidenceViewer = ({ evidence, onClose }: { evidence: EvidenceDocument; onC
     const [zoom, setZoom] = useState(100);
 
     const highlights = useMemo(() => {
-        if (!evidence.bingoData) return [];
+        if (!evidence.bingoData || !evidence.bingoData?.wordCloud) return [];
         return evidence.bingoData.wordCloud.map(w => w.word);
     }, [evidence]);
 
@@ -443,8 +443,10 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [cursorIndex, setCursorIndex] = useState(0);
+  const [triggerType, setTriggerType] = useState<'@' | '#' | '/' | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<TickerSearchItem | null>(null);
   const [showIntentMenu, setShowIntentMenu] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -557,39 +559,109 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
     const cursorPos = e.target.selectionStart || 0;
     setCursorIndex(cursorPos);
 
-    const lastAtPos = val.lastIndexOf('@', cursorPos - 1);
-    if (lastAtPos !== -1) {
-        const query = val.substring(lastAtPos + 1, cursorPos);
-        if (!query.includes(' ')) {
-            setMentionQuery(query);
-            setShowSuggestions(true);
-            return;
-        }
+    const textBeforeCursor = val.substring(0, cursorPos);
+    const words = textBeforeCursor.split(/\s+/);
+    const currentWord = words[words.length - 1];
+
+    if (currentWord.startsWith('@')) {
+        setTriggerType('@');
+        setMentionQuery(currentWord.substring(1));
+        setShowSuggestions(true);
+        setSelectedIndex(0);
+    } else if (currentWord.startsWith('#')) {
+        setTriggerType('#');
+        setMentionQuery(currentWord.substring(1));
+        setShowSuggestions(true);
+        setSelectedIndex(0);
+    } else if (currentWord.startsWith('/') && words.length === 1) {
+        setTriggerType('/');
+        setMentionQuery(currentWord.substring(1));
+        setShowSuggestions(true);
+        setSelectedIndex(0);
+    } else {
+        setShowSuggestions(false);
+        setTriggerType(null);
     }
-    
-    setShowSuggestions(false);
-    setMentionQuery(null);
   };
 
   const filteredSuggestions = useMemo(() => {
-    if (!mentionQuery) return [];
+    if (!mentionQuery && mentionQuery !== '') return [];
     const q = mentionQuery.toLowerCase();
-    return SEARCHABLE_TICKERS.filter(t => 
+    
+    let sourceList: TickerSearchItem[] = [];
+    if (triggerType === '@') sourceList = SEARCHABLE_TICKERS;
+    if (triggerType === '#') sourceList = MACROS;
+    if (triggerType === '/') sourceList = COMMANDS;
+
+    return sourceList.filter(t => 
         t.symbol.toLowerCase().includes(q) || t.name.toLowerCase().includes(q)
     ).slice(0, 5);
-  }, [mentionQuery]);
+  }, [mentionQuery, triggerType]);
 
-  const handleSelectSuggestion = (ticker: TickerSearchItem) => {
+  const handleSelectSuggestion = (item: TickerSearchItem) => {
     if (!inputRef.current) return;
     const val = inputValue;
-    const lastAtPos = val.lastIndexOf('@', cursorIndex - 1);
-    const newVal = val.substring(0, lastAtPos) + `@${ticker.symbol} ` + val.substring(cursorIndex);
+    // Find start of the word being typed
+    const textBeforeCursor = val.substring(0, cursorIndex);
+    const words = textBeforeCursor.split(/\s+/);
+    const lastWord = words[words.length - 1];
+    const startPos = textBeforeCursor.lastIndexOf(lastWord);
+    
+    if (triggerType === '/') {
+        // Commands execute immediately or replace input
+        if (item.symbol === 'portfolio') {
+            handleSendMessage("/portfolio");
+        } else {
+            setInputValue(`/${item.symbol} `);
+        }
+        setShowSuggestions(false);
+        return;
+    }
+
+    const prefix = triggerType || '';
+    const newVal = val.substring(0, startPos) + `${prefix}${item.symbol} ` + val.substring(cursorIndex);
+    
     setInputValue(newVal);
     setShowSuggestions(false);
     setMentionQuery(null);
-    setSelectedTicker(ticker);
-    setShowIntentMenu(true);
+    
+    // Trigger Intent Menu only for stocks (@)
+    if (triggerType === '@') {
+        setSelectedTicker(item);
+        setShowIntentMenu(true);
+    }
+    
     inputRef.current.focus();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Suggestion Navigation
+    if (showSuggestions && filteredSuggestions.length > 0) {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setSelectedIndex((prev) => (prev + 1) % filteredSuggestions.length);
+            return;
+        }
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setSelectedIndex((prev) => (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length);
+            return;
+        }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault();
+            handleSelectSuggestion(filteredSuggestions[selectedIndex]);
+            return;
+        }
+        if (e.key === 'Escape') {
+            setShowSuggestions(false);
+            return;
+        }
+    }
+
+    // Default Enter to Send
+    if (e.key === 'Enter') {
+        handleSendMessage(inputValue);
+    }
   };
 
   const handleIntentAction = async (docType: DocumentType, tickerOverride?: string) => {
@@ -706,7 +778,7 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
   };
 
   return (
-    <div className={`flex h-[calc(100vh-64px)] bg-gray-50 dark:bg-slate-950 overflow-hidden relative bg-grid-pattern transition-opacity duration-500 ${isGlobalFocus ? 'opacity-dimmed' : ''}`}>
+    <div className={`flex h-[calc(100dvh-64px)] bg-gray-50 dark:bg-slate-950 overflow-hidden relative bg-grid-pattern transition-opacity duration-500 ${isGlobalFocus ? 'opacity-dimmed' : ''}`}>
         
         {isGlobalFocus && <div className="absolute inset-0 bg-black/40 z-10 pointer-events-none transition-opacity" />}
 
@@ -813,7 +885,7 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                 {/* Chat Stream */}
                 <div className={`flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-8 pb-48 transition-all duration-500 ${activeTab?.evidence ? 'hidden md:block opacity-100' : 'mx-auto max-w-4xl w-full'}`}>
                     
-                    {activeTab?.messages.length === 0 && !loading && (
+                    {(!activeTab?.messages || activeTab.messages.length === 0) && !loading && (
                         <div className="h-full flex flex-col items-center justify-center animate-fade-in px-4">
                             <div className="relative w-20 h-20 sm:w-24 sm:h-24 mb-6">
                                 <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl animate-pulse"></div>
@@ -897,14 +969,10 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                                             components={{
                                                 ul: ({node, ...props}) => <ul className="list-none space-y-2 pl-0 my-4" {...props} />,
                                                 li: ({node, ...props}) => {
-                                                    // Extract text to check for tickers?
-                                                    // It's hard to parse children for ReactMarkdown easily, so we rely on text parsing component TickerChip if we want to make it clickable
-                                                    // For simplicity, we wrap children in a component that parses text
                                                     return (
                                                         <li className="flex items-start gap-2.5 text-gray-700 dark:text-gray-300" {...props}>
                                                             <span className="mt-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0" />
                                                             <span className="flex-1">
-                                                                {/* We inject interactivity into text nodes */}
                                                                 {React.Children.map(props.children, child => {
                                                                     if (typeof child === 'string') {
                                                                         return <TickerChipWrapper text={child} onTickerClick={handleTickerClick} />;
@@ -1029,15 +1097,23 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                     {/* Suggestions */}
                     {showSuggestions && filteredSuggestions.length > 0 && (
                          <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-gray-200 dark:border-slate-700 w-64 overflow-hidden animate-slide-up mx-2">
-                            {filteredSuggestions.map(t => (
+                            {filteredSuggestions.map((t, index) => (
                                 <button 
                                     key={t.symbol}
                                     onClick={() => handleSelectSuggestion(t)}
-                                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-b border-gray-100 dark:border-slate-700 last:border-0 flex justify-between items-center group/item"
+                                    onMouseEnter={() => setSelectedIndex(index)}
+                                    className={`w-full text-left px-4 py-2.5 border-b border-gray-100 dark:border-slate-700 last:border-0 flex justify-between items-center group/item transition-colors ${
+                                        index === selectedIndex 
+                                        ? 'bg-blue-50 dark:bg-blue-900/20' 
+                                        : 'hover:bg-blue-50 dark:hover:bg-blue-900/20'
+                                    }`}
                                 >
                                     <div>
-                                        <span className="block font-bold text-sm text-gray-800 dark:text-white group-hover/item:text-blue-600">{t.symbol}</span>
+                                        <span className="block font-bold text-sm text-gray-800 dark:text-white group-hover/item:text-blue-600">
+                                            {triggerType === '#' ? '#' : triggerType === '/' ? '/' : ''}{t.symbol}
+                                        </span>
                                         <span className="block text-xs text-gray-500">{t.name}</span>
+                                        {t.description && <span className="block text-[10px] text-gray-400 italic truncate">{t.description}</span>}
                                     </div>
                                     <span className="text-[10px] bg-gray-100 dark:bg-slate-700 text-gray-500 px-1.5 py-0.5 rounded">{t.type}</span>
                                 </button>
@@ -1052,8 +1128,8 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                                 type="text" 
                                 value={inputValue}
                                 onChange={handleInputChange}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(inputValue)}
-                                placeholder="Ask FinGenie... (Type @ for stocks, /portfolio for health)" 
+                                onKeyDown={handleKeyDown}
+                                placeholder="Ask FinGenie... (Type @ for stocks, # for macros, / for tools)" 
                                 className="w-full bg-transparent border-none text-gray-900 dark:text-white placeholder-gray-400 focus:ring-0 py-3 px-4 text-sm sm:text-base font-medium"
                             />
                         </div>

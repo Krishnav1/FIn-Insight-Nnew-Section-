@@ -9,12 +9,12 @@ interface DominoGraphProps {
 }
 
 const DominoGraph: React.FC<DominoGraphProps> = ({ data, targetTicker }) => {
-  if (!data || !data.nodes || !data.edges) return null;
+  if (!data) return null;
 
-  const suppliers = data.nodes.filter(n => n.type === 'supplier');
-  const customers = data.nodes.filter(n => n.type === 'customer');
+  const suppliers = (data.nodes || []).filter(n => n.type === 'supplier');
+  const customers = (data.nodes || []).filter(n => n.type === 'customer');
   // If target isn't explicitly in nodes, we create a dummy visual for it
-  const targetNode = data.nodes.find(n => n.type === 'target') || { id: 'TARGET', name: targetTicker, type: 'target', sentiment: 'neutral', impactDetails: '' };
+  const targetNode = (data.nodes || []).find(n => n.type === 'target') || { id: 'TARGET', name: targetTicker, type: 'target', sentiment: 'neutral', impactDetails: '' };
 
   const renderNode = (node: DominoNode) => {
     const isRisk = node.sentiment === 'negative';

@@ -32,7 +32,8 @@ export type DocumentType = 'annual_report' | 'concall' | 'quarterly_result' | 'r
 export interface TickerSearchItem {
   symbol: string;
   name: string;
-  type: 'Portfolio' | 'Stock' | 'Index';
+  type: 'Portfolio' | 'Stock' | 'Index' | 'Sector' | 'Commodity' | 'Forex' | 'Macro' | 'Event' | 'Command';
+  description?: string;
 }
 
 export interface AIHistoryItem {
@@ -117,6 +118,18 @@ export interface PortfolioHealthReport {
   timestamp: number;
 }
 
+// Structured News Insight
+export interface NewsInsight {
+  gist: string;
+  stats: Array<{ label: string; value: string }>;
+  outlook: string;
+  hypeScore: number; // 0-100
+  impact: {
+    beneficiaries: string[];
+    negativelyImpacted: string[];
+  };
+}
+
 export interface ChatMessage {
   id: string;
   role: Role;
@@ -126,6 +139,7 @@ export interface ChatMessage {
   chartData?: ChartData; // Optional JSON for dynamic charts (Recharts)
   dominoData?: DominoData; // Optional JSON for Supply Chain Graph
   portfolioReport?: PortfolioHealthReport; // Optional JSON for Portfolio Dashboard
+  insightData?: NewsInsight; // Optional JSON for Structured Summary
   timestamp: number;
   isLoading?: boolean;
   liked?: boolean; // For user feedback
