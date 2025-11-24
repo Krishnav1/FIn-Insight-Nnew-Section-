@@ -1,7 +1,7 @@
 
 
-import React, { useState, useEffect } from 'react';
-import { ArrowRight, Terminal, BarChart2, Shield, BrainCircuit, Activity, ChevronRight, Play, Sparkles, Check, TrendingUp, TrendingDown } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowRight, Terminal, BarChart2, Shield, BrainCircuit, Activity, Play, Sparkles, TrendingUp, TrendingDown, Search, AlertTriangle, PieChart, ShieldAlert, Zap, Lock, Cpu, CheckCircle2, Pause } from 'lucide-react';
 
 interface LandingPageProps {
   onLaunch: () => void;
@@ -9,29 +9,25 @@ interface LandingPageProps {
 
 const HeroTicker = () => {
     return (
-        <div className="absolute top-0 left-0 right-0 h-10 bg-theme-surface/50 border-b border-theme-border backdrop-blur-sm z-20 flex items-center overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-10 bg-theme-surface/80 border-b border-theme-border backdrop-blur-md z-30 flex items-center overflow-hidden">
              <div className="flex items-center whitespace-nowrap animate-marquee">
-                 {[1,2,3,4].map(i => (
+                 {[1,2,3,4,5,6].map(i => (
                      <React.Fragment key={i}>
-                         <span className="mx-4 text-xs font-mono text-theme-muted flex items-center gap-2">
+                         <span className="mx-6 text-xs font-mono text-theme-muted flex items-center gap-2">
                              <span className="font-bold text-theme-text">NIFTY</span>
                              <span className="text-emerald-500 flex items-center"><TrendingUp size={10} className="mr-0.5"/> 22,450.30</span>
                          </span>
-                         <span className="mx-4 text-xs font-mono text-theme-muted flex items-center gap-2">
+                         <span className="mx-6 text-xs font-mono text-theme-muted flex items-center gap-2">
                              <span className="font-bold text-theme-text">RELIANCE</span>
                              <span className="text-rose-500 flex items-center"><TrendingDown size={10} className="mr-0.5"/> 2,930.15</span>
                          </span>
-                         <span className="mx-4 text-xs font-mono text-theme-muted flex items-center gap-2">
+                         <span className="mx-6 text-xs font-mono text-theme-muted flex items-center gap-2">
                              <span className="font-bold text-theme-text">HDFCBANK</span>
                              <span className="text-emerald-500 flex items-center"><TrendingUp size={10} className="mr-0.5"/> 1,450.00</span>
                          </span>
-                         <span className="mx-4 text-xs font-mono text-theme-muted flex items-center gap-2">
+                         <span className="mx-6 text-xs font-mono text-theme-muted flex items-center gap-2">
                              <span className="font-bold text-theme-text">GOLD</span>
                              <span className="text-emerald-500 flex items-center"><TrendingUp size={10} className="mr-0.5"/> 68,000.00</span>
-                         </span>
-                         <span className="mx-4 text-xs font-mono text-theme-muted flex items-center gap-2">
-                             <span className="font-bold text-theme-text">USD/INR</span>
-                             <span className="text-theme-text">83.40</span>
                          </span>
                      </React.Fragment>
                  ))}
@@ -40,66 +36,338 @@ const HeroTicker = () => {
     );
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onLaunch }) => {
-  // Simulator State
-  const [typedText, setTypedText] = useState('');
-  const [showResponse, setShowResponse] = useState(false);
-  const [exampleIndex, setExampleIndex] = useState(0);
+// --- LIVE DEMO SIMULATOR COMPONENTS ---
 
-  const examples = [
-    { cmd: "Analyze Reliance annual report", response: "Processing FY24 Annual Report... Revenue up 12%. Key Risks: O2C Margin Pressure." },
-    { cmd: "Check portfolio risk", response: "Concentration Detected: 40% exposure to Banking Sector. Suggestion: Diversify into Pharma." },
-    { cmd: "Explain recent RBI policy", response: "RBI kept repo rate at 6.5%. Hawkish stance on inflation. Impact: Neutral for Banks." }
-  ];
+interface DemoScenario {
+    id: string;
+    label: string;
+    icon: any;
+    prompt: string;
+    responseUI: React.ReactNode;
+    color: string;
+    accentColor: string;
+}
 
-  // Typing Effect Logic
-  useEffect(() => {
-    let currentText = '';
-    const fullText = examples[exampleIndex].cmd;
-    let charIndex = 0;
-    let typeInterval: any;
-    let resetTimeout: any;
+const LiveDemo = () => {
+    const [activeScenarioIdx, setActiveScenarioIdx] = useState(0);
+    const [typedText, setTypedText] = useState('');
+    const [stage, setStage] = useState<'idle' | 'typing' | 'scanning' | 'thinking' | 'result'>('idle');
+    const [isPaused, setIsPaused] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
 
-    const startTyping = () => {
-       setShowResponse(false);
-       setTypedText('');
-       currentText = '';
-       charIndex = 0;
+    const scenarios: DemoScenario[] = [
+        {
+            id: 'compare',
+            label: 'Market Battle',
+            icon: BarChart2,
+            color: 'text-blue-400',
+            accentColor: 'bg-blue-500',
+            prompt: "Compare TCS vs Infosys. Who wins on growth?",
+            responseUI: (
+                <div className="w-full animate-fade-in">
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                            <h4 className="font-bold text-white text-sm tracking-wide">Growth Analysis</h4>
+                        </div>
+                        <span className="text-[10px] bg-blue-500/10 text-blue-300 px-2 py-1 rounded border border-blue-500/20 font-mono">
+                            VERDICT: TCS
+                        </span>
+                    </div>
+                    
+                    {/* Visual Comparison Chart */}
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700 relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                            <div className="text-[10px] text-gray-400 uppercase mb-1">TCS Revenue (3Y)</div>
+                            <div className="text-xl font-bold text-white mb-1">12.5%</div>
+                            <div className="w-full bg-gray-700 h-1.5 rounded-full overflow-hidden">
+                                <div className="bg-blue-500 h-full w-[85%] shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+                            </div>
+                        </div>
+                        <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700 relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-gray-500"></div>
+                            <div className="text-[10px] text-gray-400 uppercase mb-1">INFY Revenue (3Y)</div>
+                            <div className="text-xl font-bold text-gray-300 mb-1">9.8%</div>
+                            <div className="w-full bg-gray-700 h-1.5 rounded-full overflow-hidden">
+                                <div className="bg-gray-500 h-full w-[65%]"></div>
+                            </div>
+                        </div>
+                    </div>
 
-       typeInterval = setInterval(() => {
-          if (charIndex < fullText.length) {
-            currentText += fullText.charAt(charIndex);
-            setTypedText(currentText);
-            charIndex++;
-          } else {
-            clearInterval(typeInterval);
-            setTimeout(() => setShowResponse(true), 500);
+                    <div className="p-3 bg-gradient-to-r from-blue-900/20 to-transparent border-l-2 border-blue-500">
+                        <p className="text-xs text-blue-100 leading-relaxed font-mono">
+                            <span className="text-blue-400 font-bold">INSIGHT:</span> TCS secured $11B in TCV this quarter, outperforming Infosys in large deal conversions despite macro headwinds.
+                        </p>
+                    </div>
+                </div>
+            )
+        },
+        {
+            id: 'forensic',
+            label: 'Forensic Scan',
+            icon: ShieldAlert,
+            color: 'text-rose-400',
+            accentColor: 'bg-rose-500',
+            prompt: "Scan Adani Enterprises annual report for red flags.",
+            responseUI: (
+                <div className="w-full animate-fade-in relative overflow-hidden">
+                    {/* Header */}
+                    <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-700/50">
+                        <div className="w-12 h-12 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500 border border-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.15)] relative">
+                             <AlertTriangle size={24} />
+                             <div className="absolute inset-0 border border-rose-500/40 rounded-xl animate-ping opacity-20"></div>
+                        </div>
+                        <div>
+                            <h4 className="font-bold text-white text-sm">Forensic Risk Detected</h4>
+                            <div className="flex items-center gap-2 mt-1">
+                                <div className="h-1.5 w-24 bg-gray-700 rounded-full overflow-hidden">
+                                    <div className="h-full bg-rose-500 w-[78%]"></div>
+                                </div>
+                                <span className="text-[10px] text-rose-400 font-mono font-bold">RISK: HIGH (78/100)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Findings */}
+                    <div className="space-y-2">
+                        <div className="p-3 bg-rose-950/30 rounded border border-rose-500/20 flex gap-3 items-start group hover:bg-rose-900/20 transition-colors">
+                             <div className="mt-0.5 text-rose-500"><Search size={14}/></div>
+                             <div>
+                                 <div className="text-[10px] font-bold text-rose-300 uppercase tracking-wider mb-0.5 group-hover:text-rose-200">Related Party Transactions</div>
+                                 <p className="text-[11px] text-gray-400 leading-tight">Loans to subsidiary "Entity X" increased by <span className="text-white font-bold">400%</span> without corresponding revenue growth.</p>
+                             </div>
+                        </div>
+                        <div className="p-3 bg-amber-950/20 rounded border border-amber-500/20 flex gap-3 items-start">
+                             <div className="mt-0.5 text-amber-500"><Activity size={14}/></div>
+                             <div>
+                                 <div className="text-[10px] font-bold text-amber-300 uppercase tracking-wider mb-0.5">Cash Flow Divergence</div>
+                                 <p className="text-[11px] text-gray-400 leading-tight">Operating Profit is up, but <span className="text-white font-bold">Operating Cash Flow is negative</span> for Q3.</p>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            )
+        },
+        {
+            id: 'portfolio',
+            label: 'Portfolio Audit',
+            icon: PieChart,
+            color: 'text-purple-400',
+            accentColor: 'bg-purple-500',
+            prompt: "Audit my portfolio. Is my allocation safe?",
+            responseUI: (
+                <div className="w-full animate-fade-in">
+                     <div className="flex gap-4 items-center mb-4">
+                         <div className="relative">
+                             <svg className="w-16 h-16 transform -rotate-90">
+                                 <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-gray-700" />
+                                 <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-purple-500" strokeDasharray="175" strokeDashoffset="40" />
+                             </svg>
+                             <div className="absolute inset-0 flex items-center justify-center flex-col">
+                                 <span className="text-[10px] text-gray-400 font-bold uppercase">Risk</span>
+                                 <span className="text-sm font-bold text-white">High</span>
+                             </div>
+                         </div>
+                         <div>
+                             <h4 className="font-bold text-white text-sm mb-1">Concentration Alert</h4>
+                             <p className="text-[11px] text-gray-400 leading-tight max-w-[200px]">
+                                 You are <strong className="text-white">65% exposed to Banking</strong>. Regulatory changes could impact >50% of your capital.
+                             </p>
+                         </div>
+                     </div>
+                     
+                     {/* Suggestion */}
+                     <div className="p-3 bg-gray-800 rounded-lg border border-gray-700 flex items-center gap-3">
+                         <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                             <Zap size={14} />
+                         </div>
+                         <div>
+                             <div className="text-[10px] text-gray-400 uppercase font-bold">AI Suggestion</div>
+                             <div className="text-xs text-gray-200">Hedge with <span className="text-emerald-400 font-bold">Gold BeES</span> or diversify into Pharma.</div>
+                         </div>
+                     </div>
+                </div>
+            )
+        }
+    ];
+
+    useEffect(() => {
+        if (isPaused) return;
+
+        let typingInterval: any;
+        let nextStageTimeout: any;
+
+        const currentScenario = scenarios[activeScenarioIdx];
+
+        const runSequence = () => {
+            setTypedText('');
+            setStage('typing');
             
-            // Move to next example
-            resetTimeout = setTimeout(() => {
-                setExampleIndex((prev) => (prev + 1) % examples.length);
-            }, 4000);
-          }
-       }, 50); // Typing speed
-    };
+            let charIdx = 0;
+            // Type faster
+            typingInterval = setInterval(() => {
+                if (charIdx <= currentScenario.prompt.length) {
+                    setTypedText(currentScenario.prompt.slice(0, charIdx));
+                    charIdx++;
+                } else {
+                    clearInterval(typingInterval);
+                    setStage('scanning');
+                    
+                    // Show "Scanning/Thinking" visualization
+                    nextStageTimeout = setTimeout(() => {
+                        setStage('thinking');
+                        
+                        setTimeout(() => {
+                            setStage('result');
+                            
+                            nextStageTimeout = setTimeout(() => {
+                                // Go to next scenario
+                                setActiveScenarioIdx(prev => (prev + 1) % scenarios.length);
+                            }, 6000); // Wait 6s on result to let user read
+                        }, 1200);
 
-    startTyping();
+                    }, 800);
+                }
+            }, 30);
+        };
 
-    return () => {
-        clearInterval(typeInterval);
-        clearTimeout(resetTimeout);
-    };
-  }, [exampleIndex]);
+        runSequence();
 
+        return () => {
+            clearInterval(typingInterval);
+            clearTimeout(nextStageTimeout);
+        };
+    }, [activeScenarioIdx, isPaused]);
+
+    const activeScenario = scenarios[activeScenarioIdx];
+
+    return (
+        <div className="w-full max-w-5xl mx-auto" ref={containerRef}>
+            {/* Terminal Window Frame */}
+            <div className="rounded-xl bg-[#0d1117] border border-gray-800 shadow-2xl overflow-hidden ring-1 ring-white/10 relative group">
+                 
+                 {/* Decorative Glow */}
+                 <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-1 bg-${activeScenario.color.split('-')[1]}-500/50 blur-[2px] transition-colors duration-500`}></div>
+
+                 {/* Terminal Header */}
+                 <div className="h-10 bg-[#161b22] border-b border-gray-800 flex items-center px-4 justify-between relative z-10">
+                      <div className="flex gap-2">
+                          <div className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e]/50"></div>
+                          <div className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123]/50"></div>
+                          <div className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29]/50"></div>
+                      </div>
+                      <div className="text-[10px] font-mono text-gray-500 flex items-center gap-2">
+                          <Lock size={10} />
+                          <span>fingenie_core_v2.5.exe</span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      </div>
+                      <div className="flex gap-4">
+                           <button onClick={() => setIsPaused(!isPaused)} className="text-gray-500 hover:text-white transition-colors">
+                                {isPaused ? <Play size={12} /> : <Pause size={12} />}
+                           </button>
+                      </div>
+                 </div>
+
+                 {/* Terminal Body */}
+                 <div className="p-6 md:p-10 min-h-[400px] flex flex-col font-mono relative bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-opacity-20">
+                     {/* Background Grid */}
+                     <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:20px_20px]"></div>
+                     
+                     <div className="relative z-10 flex flex-col gap-8 max-w-3xl mx-auto w-full">
+                         
+                         {/* Scenario Tabs (Interactive) */}
+                         <div className="flex justify-center gap-2 mb-4">
+                            {scenarios.map((s, idx) => (
+                                <button
+                                    key={s.id}
+                                    onClick={() => { setActiveScenarioIdx(idx); setStage('typing'); }}
+                                    className={`
+                                        px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border transition-all duration-300
+                                        ${idx === activeScenarioIdx 
+                                            ? `bg-gray-800 border-gray-600 text-white shadow-[0_0_15px_rgba(0,0,0,0.5)] scale-105` 
+                                            : 'bg-transparent border-transparent text-gray-600 hover:text-gray-400 hover:bg-gray-800/50'}
+                                    `}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <s.icon size={14} className={idx === activeScenarioIdx ? s.color : ''} />
+                                        {s.label}
+                                    </div>
+                                </button>
+                            ))}
+                         </div>
+
+                         {/* Chat Bubble (User) */}
+                         <div className="flex gap-4 items-start animate-slide-up">
+                             <div className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center shrink-0 border border-gray-700 shadow-lg">
+                                 <div className="w-5 h-5 rounded-full bg-gray-600 flex items-center justify-center">
+                                     <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                                 </div>
+                             </div>
+                             <div className="bg-[#1e232a] text-gray-200 px-6 py-4 rounded-2xl rounded-tl-none border border-gray-700/50 shadow-xl w-full">
+                                 <div className="text-[10px] text-gray-500 mb-1 font-bold uppercase tracking-wider">User Input</div>
+                                 <div className="text-sm md:text-base font-medium">
+                                     {typedText}<span className="typing-cursor inline-block w-2 h-4 bg-blue-500 ml-1 align-middle"></span>
+                                 </div>
+                             </div>
+                         </div>
+
+                         {/* Scanning / Thinking State */}
+                         {(stage === 'scanning' || stage === 'thinking') && (
+                             <div className="pl-14 animate-fade-in">
+                                 <div className="flex items-center gap-3 text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                                     <Cpu size={14} className="text-theme-accent animate-spin" />
+                                     Processing Data...
+                                 </div>
+                                 <div className="h-1 w-64 bg-gray-800 rounded-full overflow-hidden">
+                                     <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 animate-shimmer w-full"></div>
+                                 </div>
+                             </div>
+                         )}
+
+                         {/* AI Response Card */}
+                         {stage === 'result' && (
+                             <div className="flex gap-4 items-start animate-fade-in-up">
+                                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shrink-0 border border-white/10 text-white font-bold text-sm shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+                                      F
+                                  </div>
+                                  <div className="flex-1 w-full">
+                                      <div className="bg-[#13161c] rounded-2xl border border-gray-700/50 shadow-2xl overflow-hidden relative">
+                                          {/* Top Accent Line */}
+                                          <div className={`h-1 w-full ${activeScenario.accentColor}`}></div>
+                                          
+                                          <div className="p-6">
+                                              {activeScenario.responseUI}
+                                          </div>
+
+                                          {/* Footer Metadata */}
+                                          <div className="bg-[#0d1015] px-6 py-3 border-t border-gray-800 flex justify-between items-center text-[10px] text-gray-500 font-mono">
+                                              <div className="flex gap-4">
+                                                  <span className="flex items-center gap-1"><CheckCircle2 size={10} className="text-emerald-500"/> Confidence: 98%</span>
+                                                  <span className="flex items-center gap-1"><Search size={10} /> Sources: 4</span>
+                                              </div>
+                                              <span>Latency: 45ms</span>
+                                          </div>
+                                      </div>
+                                  </div>
+                             </div>
+                         )}
+                     </div>
+                 </div>
+            </div>
+        </div>
+    );
+}
+
+const LandingPage: React.FC<LandingPageProps> = ({ onLaunch }) => {
   return (
     <div className="min-h-screen bg-theme-bg text-theme-text relative overflow-hidden selection:bg-theme-accent/30 pt-10">
       
       <HeroTicker />
 
       {/* Background Effects */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-10 pointer-events-none"></div>
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[120px] animate-blob mix-blend-screen"></div>
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] animate-blob animation-delay-2000 mix-blend-screen"></div>
+      <div className="absolute inset-0 bg-grid-pattern opacity-5 pointer-events-none"></div>
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none mix-blend-screen"></div>
 
       {/* Navigation */}
       <nav className="relative z-50 flex items-center justify-between px-6 py-6 max-w-7xl mx-auto mt-6">
@@ -112,147 +380,81 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLaunch }) => {
         </div>
         <button 
             onClick={onLaunch}
-            className="px-6 py-2.5 rounded-full border border-theme-border hover:bg-theme-surface hover:border-theme-accent/50 transition-all text-sm font-bold flex items-center gap-2 text-theme-text group shadow-sm"
+            className="px-6 py-2.5 rounded-full border border-theme-border hover:bg-theme-surface hover:border-theme-accent/50 transition-all text-sm font-bold flex items-center gap-2 text-theme-text group shadow-sm bg-white/5 backdrop-blur-sm"
         >
             Enter Workspace <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform"/>
         </button>
       </nav>
 
       {/* Hero Section */}
-      <main className="relative z-10 pt-20 pb-32 px-6 max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-16">
-        
-        {/* Text Content */}
-        <div className="lg:w-1/2 space-y-8 animate-fade-in text-center lg:text-left">
-           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-theme-accent/10 border border-theme-accent/20 text-theme-accent text-xs font-bold uppercase tracking-wider shadow-sm">
-              <Sparkles size={12} /> The AI Advantage
+      <main className="relative z-10 pt-20 pb-20 px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
+           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 text-xs font-bold uppercase tracking-wider shadow-sm mb-8 animate-fade-in backdrop-blur-sm">
+              <Sparkles size={12} /> v2.0 Now Live
            </div>
            
-           <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight leading-[1.05] text-theme-text">
+           <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tight leading-[1.05] text-theme-text mb-6 max-w-5xl mx-auto drop-shadow-sm">
               Decode the <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 animate-pulse-glow">Market Noise.</span>
            </h1>
            
-           <p className="text-lg text-theme-muted max-w-xl leading-relaxed mx-auto lg:mx-0">
+           <p className="text-lg md:text-xl text-theme-muted max-w-2xl leading-relaxed mx-auto mb-10 font-medium">
               Your professional financial workspace. Stop scrolling through endless news feeds. 
               <strong> FinGenie</strong> analyzes annual reports, simulates portfolio risks, and detects red flags in seconds.
            </p>
 
-           <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center lg:justify-start">
+           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-24 w-full sm:w-auto">
               <button 
                 onClick={onLaunch}
-                className="group relative px-8 py-4 bg-theme-accent text-white rounded-xl font-bold text-lg shadow-xl shadow-theme-accent/20 hover:shadow-2xl hover:shadow-theme-accent/40 hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden"
+                className="group relative px-8 py-4 bg-theme-accent text-white rounded-xl font-bold text-lg shadow-[0_10px_40px_-10px_rgba(59,130,246,0.5)] hover:shadow-[0_20px_60px_-10px_rgba(59,130,246,0.6)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden w-full sm:w-auto"
               >
                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                 Launch FinGenie
-                 <ArrowRight size={18} className="text-white"/>
+                 Launch Workspace
+                 <ArrowRight size={18} className="text-white group-hover:translate-x-1 transition-transform"/>
               </button>
-              <button className="px-8 py-4 bg-theme-surface border border-theme-border hover:border-theme-accent/50 rounded-xl font-bold text-lg text-theme-text transition-all duration-300 flex items-center justify-center gap-2 hover:bg-theme-bg">
-                 <Play size={18} className="fill-current"/> Watch Demo
+              <button className="px-8 py-4 bg-theme-surface/50 border border-theme-border hover:border-theme-text/30 rounded-xl font-bold text-lg text-theme-text transition-all duration-300 flex items-center justify-center gap-2 hover:bg-theme-bg w-full sm:w-auto backdrop-blur-sm">
+                 <Play size={18} className="fill-current"/> Watch Video
               </button>
            </div>
-           
-           <div className="flex items-center justify-center lg:justify-start gap-6 text-xs text-theme-muted font-mono pt-6 border-t border-theme-border/50 mt-6 max-w-md mx-auto lg:mx-0">
-               <span className="flex items-center gap-1.5"><Check size={14} className="text-emerald-500"/> Real-time Analysis</span>
-               <span className="flex items-center gap-1.5"><Check size={14} className="text-emerald-500"/> Privacy Focused</span>
-               <span className="flex items-center gap-1.5"><Check size={14} className="text-emerald-500"/> Institutional Grade</span>
+
+           {/* LIVE PRODUCT SIMULATOR SECTION */}
+           <div className="w-full relative z-20">
+               {/* Glowing Backdrop for Simulator */}
+               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-blue-600/5 blur-[100px] rounded-full pointer-events-none"></div>
+               
+               <div className="flex items-center justify-between max-w-5xl mx-auto mb-6 px-4">
+                   <div className="text-sm font-bold text-theme-muted uppercase tracking-wider flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                       Live System Demo
+                   </div>
+               </div>
+
+               <LiveDemo />
            </div>
-        </div>
-
-        {/* Interactive Simulator / Visual */}
-        <div className="lg:w-1/2 w-full relative perspective-1000">
-            {/* The Floating Card */}
-            <div className="relative z-20 bg-gray-900/90 backdrop-blur-xl border border-gray-700 rounded-2xl shadow-2xl overflow-hidden animate-float transform rotate-y-6 hover:rotate-y-0 transition-transform duration-700">
-                {/* Window Controls */}
-                <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-700 bg-gray-800/50">
-                    <div className="flex gap-1.5">
-                        <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
-                        <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-                        <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
-                    </div>
-                    <div className="ml-auto text-[10px] font-mono text-gray-400 flex items-center gap-2">
-                        <Activity size={10} className="text-emerald-500 animate-pulse"/>
-                        fingenie_core.exe
-                    </div>
-                </div>
-
-                {/* Simulation Area */}
-                <div className="p-6 font-mono text-sm h-[360px] flex flex-col">
-                    {/* Bot Greeting */}
-                    <div className="flex gap-3 mb-6">
-                        <div className="w-8 h-8 rounded bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0 border border-blue-500/30">
-                            <Terminal size={16} />
-                        </div>
-                        <div className="text-gray-400">
-                            <p className="text-white font-bold mb-1">FinGenie v2.5 Online</p>
-                            <p className="text-xs">System initialized. Market data feed active.</p>
-                        </div>
-                    </div>
-
-                    {/* User Input Simulation */}
-                    <div className="flex gap-3 mb-6 items-center">
-                         <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 shrink-0 border border-purple-500/30">
-                            <div className="w-2 h-2 rounded-full bg-purple-400"></div>
-                        </div>
-                        <div className="text-white font-bold text-base bg-gray-800/50 px-4 py-2 rounded-lg border border-gray-700 w-full">
-                            <span className="text-purple-400 mr-2">$</span>
-                            {typedText}<span className="typing-cursor"></span>
-                        </div>
-                    </div>
-
-                    {/* Bot Response Simulation */}
-                    {showResponse && (
-                        <div className="flex gap-3 animate-fade-in mt-auto">
-                            <div className="w-8 h-8 rounded bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0 border border-blue-500/30">
-                                <BrainCircuit size={16} />
-                            </div>
-                            <div className="bg-gray-800/80 p-4 rounded-lg border border-gray-700 w-full shadow-lg">
-                                <div className="text-emerald-400 text-[10px] font-bold mb-2 flex items-center gap-1 border-b border-gray-700 pb-2">
-                                    <Activity size={10} /> ANALYSIS COMPLETE • 0.4s
-                                </div>
-                                <p className="text-gray-200 leading-relaxed text-sm">
-                                    {examples[exampleIndex].response}
-                                </p>
-                                {/* Mock Chart Bar */}
-                                <div className="mt-4 flex items-end gap-1 h-10 border-l border-b border-gray-600 pl-1 pb-1">
-                                    <div className="w-3 bg-blue-500/30 h-4 rounded-t-sm"></div>
-                                    <div className="w-3 bg-blue-500/50 h-6 rounded-t-sm"></div>
-                                    <div className="w-3 bg-blue-500/80 h-3 rounded-t-sm"></div>
-                                    <div className="w-3 bg-emerald-500 h-8 rounded-t-sm animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
-                                    <div className="w-3 bg-blue-500/40 h-5 rounded-t-sm"></div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Decorative Elements behind card */}
-            <div className="absolute -top-20 -right-20 w-64 h-64 bg-theme-accent/30 rounded-full blur-[80px] animate-pulse"></div>
-            <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-purple-600/30 rounded-full blur-[60px]"></div>
-        </div>
       </main>
 
       {/* Feature Grid Section */}
-      <section className="relative z-10 py-24 border-t border-theme-border bg-theme-surface/30">
+      <section className="relative z-10 py-32 border-t border-theme-border bg-theme-surface/30">
           <div className="max-w-7xl mx-auto px-6">
               <div className="text-center mb-16">
-                  <h2 className="text-3xl font-bold mb-4 text-theme-text">Not just a news feed. <span className="text-theme-accent">A Financial Weapon.</span></h2>
-                  <p className="text-theme-muted max-w-2xl mx-auto">FinInsight provides the tools hedge funds use, democratized for you. Access institutional-grade analysis without the terminal fee.</p>
+                  <h2 className="text-3xl font-black text-theme-text mb-4">Institutional Grade Tools</h2>
+                  <p className="text-theme-muted">Everything you need to analyze like a hedge fund.</p>
               </div>
 
               <div className="grid md:grid-cols-3 gap-8">
-                  <div className="group p-8 rounded-3xl bg-theme-surface border border-theme-border hover:border-theme-accent/50 transition-all duration-300 hover:bg-theme-bg hover:shadow-xl hover:shadow-theme-accent/5 hover:-translate-y-2">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/10 to-blue-600/10 flex items-center justify-center text-theme-accent mb-6 group-hover:scale-110 transition-transform ring-1 ring-theme-accent/20">
+                  <div className="group p-8 rounded-3xl bg-theme-surface border border-theme-border hover:border-theme-accent/50 transition-all duration-300 hover:bg-theme-bg hover:shadow-2xl hover:shadow-theme-accent/10 hover:-translate-y-2 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-bl-full pointer-events-none group-hover:bg-blue-500/10 transition-colors"></div>
+                      <div className="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 mb-6 group-hover:scale-110 transition-transform ring-1 ring-blue-500/20 shadow-lg shadow-blue-500/10">
                           <Terminal size={28} />
                       </div>
-                      <h3 className="text-xl font-bold mb-3 text-theme-text">FinGenie Workspace</h3>
+                      <h3 className="text-xl font-bold mb-3 text-theme-text">Command Center</h3>
                       <p className="text-theme-muted text-sm leading-relaxed">
-                          Your central command. Use <span className="font-mono text-theme-accent bg-theme-bg px-1 rounded border border-theme-border">@stock</span> to analyze companies and <span className="font-mono text-purple-400 bg-theme-bg px-1 rounded border border-theme-border">#macro</span> for economic context.
+                          Your central command. Use <span className="font-mono text-blue-400 font-bold">@stock</span> to analyze companies and <span className="font-mono text-purple-400 font-bold">#macro</span> for economic context.
                       </p>
                   </div>
 
-                  <div className="group p-8 rounded-3xl bg-theme-surface border border-theme-border hover:border-purple-500/50 transition-all duration-300 hover:bg-theme-bg hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-2">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 flex items-center justify-center text-purple-400 mb-6 group-hover:scale-110 transition-transform ring-1 ring-purple-500/20">
+                  <div className="group p-8 rounded-3xl bg-theme-surface border border-theme-border hover:border-purple-500/50 transition-all duration-300 hover:bg-theme-bg hover:shadow-2xl hover:shadow-purple-500/10 hover:-translate-y-2 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-bl-full pointer-events-none group-hover:bg-purple-500/10 transition-colors"></div>
+                      <div className="w-14 h-14 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-500 mb-6 group-hover:scale-110 transition-transform ring-1 ring-purple-500/20 shadow-lg shadow-purple-500/10">
                           <BrainCircuit size={28} />
                       </div>
                       <h3 className="text-xl font-bold mb-3 text-theme-text">Portfolio Brain</h3>
@@ -261,8 +463,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLaunch }) => {
                       </p>
                   </div>
 
-                  <div className="group p-8 rounded-3xl bg-theme-surface border border-theme-border hover:border-emerald-500/50 transition-all duration-300 hover:bg-theme-bg hover:shadow-xl hover:shadow-emerald-500/5 hover:-translate-y-2">
-                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 flex items-center justify-center text-emerald-500 mb-6 group-hover:scale-110 transition-transform ring-1 ring-emerald-500/20">
+                  <div className="group p-8 rounded-3xl bg-theme-surface border border-theme-border hover:border-emerald-500/50 transition-all duration-300 hover:bg-theme-bg hover:shadow-2xl hover:shadow-emerald-500/10 hover:-translate-y-2 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-bl-full pointer-events-none group-hover:bg-emerald-500/10 transition-colors"></div>
+                      <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 mb-6 group-hover:scale-110 transition-transform ring-1 ring-emerald-500/20 shadow-lg shadow-emerald-500/10">
                           <Shield size={28} />
                       </div>
                       <h3 className="text-xl font-bold mb-3 text-theme-text">Forensic Scan</h3>
@@ -275,9 +478,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLaunch }) => {
       </section>
 
       {/* Footer */}
-      <footer className="py-10 text-center text-xs text-theme-muted border-t border-theme-border bg-theme-bg">
+      <footer className="py-12 text-center text-xs text-theme-muted border-t border-theme-border bg-theme-bg">
           <div className="flex items-center justify-center gap-2 mb-4">
-               <div className="w-6 h-6 rounded bg-theme-accent/20 flex items-center justify-center text-theme-accent font-bold">F</div>
+               <div className="w-6 h-6 rounded bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold">F</div>
                <span className="font-bold text-theme-text text-sm">FinInsight</span>
           </div>
           <p>© {new Date().getFullYear()} FinInsight. Powered by Google Gemini.</p>

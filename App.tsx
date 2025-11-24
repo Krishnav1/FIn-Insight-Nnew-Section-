@@ -236,14 +236,32 @@ const App: React.FC = () => {
   // --- Handlers ---
 
   const handleLaunch = () => {
+      // DEMO MODE: Bypass Auth
+      setIsAuthenticated(true);
+      setCurrentView('workspace');
+      
+      // Original Logic (Disabled for Demo)
+      /* 
       if (!isAuthenticated) {
           setIsAuthModalOpen(true);
       } else {
           setCurrentView('workspace');
       }
+      */
   };
 
   const handlePortfolioNav = () => {
+      // DEMO MODE: Bypass Auth
+      setIsAuthenticated(true);
+
+      if (!hasConnectedPortfolio) {
+          setIsConnectModalOpen(true);
+          return;
+      }
+      setCurrentView('portfolio');
+
+      // Original Logic (Disabled for Demo)
+      /*
       if (!isAuthenticated) {
           setIsAuthModalOpen(true);
           return;
@@ -253,6 +271,7 @@ const App: React.FC = () => {
           return;
       }
       setCurrentView('portfolio');
+      */
   };
 
   const handleLoginSuccess = () => {
