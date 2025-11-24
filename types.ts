@@ -1,9 +1,12 @@
 
+
 export enum LayoutMode {
   GRID = 'GRID',
   LIST = 'LIST',
   TIMELINE = 'TIMELINE'
 }
+
+export type Theme = 'light' | 'dark' | 'midnight' | 'terminal' | 'ocean';
 
 export interface PortfolioItem {
   symbol: string;
@@ -134,6 +137,7 @@ export interface ChatMessage {
   id: string;
   role: Role;
   text: string;
+  thoughts?: string; // New: Internal monologue/reasoning steps
   sentimentScore?: number; // -100 (Bearish) to 100 (Bullish)
   suggestions?: string[]; // Dynamic follow-up questions
   chartData?: ChartData; // Optional JSON for dynamic charts (Recharts)

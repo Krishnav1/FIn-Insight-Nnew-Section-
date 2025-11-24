@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { X, Send, TrendingUp, TrendingDown, Minus, Copy, ThumbsUp, ThumbsDown, Check, MessageCircle, FileText, Search, AlertOctagon, PieChart, Phone, Factory, Pin, Zap, Target, ArrowRight, Activity, AlertTriangle } from 'lucide-react';
+import { X, Send, TrendingUp, TrendingDown, Minus, Copy, ThumbsUp, ThumbsDown, Check, MessageCircle, FileText, Search, AlertOctagon, PieChart, Phone, Factory, Pin, Zap, Target, ArrowRight, Activity, AlertTriangle, Building2, Globe, Terminal } from 'lucide-react';
 import { Article, ChatMessage, TickerSearchItem, DocumentType, PinnedItem, NewsInsight } from '../types';
 import { SEARCHABLE_TICKERS, MACROS, COMMANDS } from '../constants';
 import ReactMarkdown from 'react-markdown';
@@ -561,21 +561,48 @@ const Sidebar: React.FC<SidebarProps> = ({
 
              {/* Autocomplete Suggestions */}
              {showSuggestions && filteredSuggestions.length > 0 && (
-                <div className="absolute bottom-full left-4 mb-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-64 overflow-hidden animate-slide-up">
+                <div className="absolute bottom-full left-4 mb-2 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 w-72 overflow-hidden animate-slide-up">
+                    {/* Suggestion Header with Helpful Tips */}
+                    <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-100 dark:border-gray-600">
+                        {triggerType === '@' && (
+                            <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                                <Building2 size={14} />
+                                <span className="text-xs font-bold uppercase">Analyze Companies</span>
+                            </div>
+                        )}
+                        {triggerType === '#' && (
+                            <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
+                                <Globe size={14} />
+                                <span className="text-xs font-bold uppercase">Economic Context</span>
+                            </div>
+                        )}
+                        {triggerType === '/' && (
+                            <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                                <Terminal size={14} />
+                                <span className="text-xs font-bold uppercase">Command Center</span>
+                            </div>
+                        )}
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                            {triggerType === '@' ? "Mention to fetch earnings, news, & analysis." : 
+                             triggerType === '#' ? "Compare assets against macro indicators." : 
+                             "Run specialized AI workflows instantly."}
+                        </p>
+                    </div>
+
                     {filteredSuggestions.map(t => (
                         <button 
                             key={t.symbol}
                             onClick={() => handleSelectSuggestion(t)}
                             className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 border-b border-gray-100 dark:border-gray-700 last:border-0 flex justify-between items-center group/item"
                         >
-                            <div>
-                                <span className="block font-bold text-sm text-gray-800 dark:text-white group-hover/item:text-blue-600">
+                            <div className="min-w-0">
+                                <span className="block font-bold text-sm text-gray-800 dark:text-white group-hover/item:text-blue-600 truncate">
                                     {triggerType === '#' ? '#' : triggerType === '/' ? '/' : ''}{t.symbol}
                                 </span>
-                                <span className="block text-xs text-gray-500">{t.name}</span>
-                                {t.description && <span className="block text-[10px] text-gray-400 italic truncate">{t.description}</span>}
+                                <span className="block text-xs text-gray-500 truncate">{t.name}</span>
+                                {t.description && <span className="block text-[10px] text-gray-400 italic truncate mt-0.5">{t.description}</span>}
                             </div>
-                            <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded">{t.type}</span>
+                            <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-1.5 py-0.5 rounded whitespace-nowrap ml-2">{t.type}</span>
                         </button>
                     ))}
                 </div>
