@@ -1,4 +1,5 @@
 
+
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { X, Send, TrendingUp, TrendingDown, Minus, Copy, ThumbsUp, ThumbsDown, Check, MessageCircle, FileText, Search, AlertOctagon, PieChart, Phone, Factory, Pin, Zap, Target, ArrowRight, Activity, AlertTriangle, Building2, Globe, Terminal, Sparkles, ExternalLink } from 'lucide-react';
 import { Article, ChatMessage, TickerSearchItem, DocumentType, PinnedItem, NewsInsight, SourceLink } from '../types';
@@ -86,20 +87,37 @@ const ContextualSuggestions = ({ triggerType, item, onAction }: { triggerType: s
 
 const SourceChips = ({ sources }: { sources: SourceLink[] }) => {
     return (
-        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-            <span className="text-[10px] text-gray-400 font-bold uppercase py-0.5">Sources:</span>
-            {sources.map((source, i) => (
-                <a 
-                    key={i} 
-                    href={source.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 text-[10px] text-gray-600 dark:text-gray-300 hover:text-blue-500 hover:border-blue-500 transition-colors truncate max-w-[120px]"
-                >
-                    <ExternalLink size={10} />
-                    {source.title}
-                </a>
-            ))}
+        <div className="flex flex-col gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <span className="text-[10px] text-gray-400 font-bold uppercase py-0.5 flex items-center gap-1">
+                <Search size={10} /> Verified Sources:
+            </span>
+            <div className="flex flex-col gap-1.5">
+                {sources.map((source, i) => (
+                    <a 
+                        key={i} 
+                        href={source.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex flex-col p-2 rounded-lg bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-white dark:hover:bg-gray-700 transition-all group"
+                    >
+                        <div className="flex items-start justify-between gap-2">
+                            <span className="text-xs font-medium text-gray-700 dark:text-gray-200 leading-tight line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                {source.title}
+                            </span>
+                            <ExternalLink size={12} className="text-gray-400 shrink-0 group-hover:text-blue-500" />
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                            <img 
+                                src={`https://www.google.com/s2/favicons?domain=${new URL(source.url).hostname}`} 
+                                alt="" 
+                                className="w-3 h-3 opacity-60" 
+                                onError={(e) => (e.currentTarget.style.display = 'none')}
+                            />
+                            <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{new URL(source.url).hostname.replace('www.', '')}</span>
+                        </div>
+                    </a>
+                ))}
+            </div>
         </div>
     );
 }

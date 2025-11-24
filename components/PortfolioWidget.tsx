@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { PortfolioHealthReport } from '../types';
 import { TrendingUp, TrendingDown, Shield, Calendar, ChevronRight, AlertTriangle, CheckCircle } from 'lucide-react';
@@ -21,31 +22,31 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ data }) => {
       <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
         <button 
           onClick={() => setActiveTab('pulse')}
-          className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'pulse' ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border-t-2 border-blue-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`flex-1 py-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-1 sm:gap-2 transition-colors ${activeTab === 'pulse' ? 'bg-white dark:bg-gray-800 text-blue-600 dark:text-blue-400 border-t-2 border-blue-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
         >
-          <TrendingUp size={16} /> Daily Pulse
+          <TrendingUp size={14} className="sm:w-4 sm:h-4" /> Pulse
         </button>
         <button 
           onClick={() => setActiveTab('risk')}
-          className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'risk' ? 'bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border-t-2 border-purple-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`flex-1 py-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-1 sm:gap-2 transition-colors ${activeTab === 'risk' ? 'bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border-t-2 border-purple-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
         >
-          <Shield size={16} /> Risk Radar
+          <Shield size={14} className="sm:w-4 sm:h-4" /> Risk
         </button>
         <button 
           onClick={() => setActiveTab('calendar')}
-          className={`flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'calendar' ? 'bg-white dark:bg-gray-800 text-orange-600 dark:text-orange-400 border-t-2 border-orange-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+          className={`flex-1 py-3 text-xs sm:text-sm font-bold flex items-center justify-center gap-1 sm:gap-2 transition-colors ${activeTab === 'calendar' ? 'bg-white dark:bg-gray-800 text-orange-600 dark:text-orange-400 border-t-2 border-orange-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
         >
-          <Calendar size={16} /> Earnings
+          <Calendar size={14} className="sm:w-4 sm:h-4" /> Earnings
         </button>
       </div>
 
       {/* Content Area */}
-      <div className="p-5 min-h-[250px]">
+      <div className="p-4 sm:p-5 min-h-[250px]">
         
         {/* TAB 1: DAILY PULSE (ATTRIBUTION) */}
         {activeTab === 'pulse' && (
           <div className="animate-fade-in">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
                 <div>
                     <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Portfolio Sentiment</h3>
                     <div className="flex items-center gap-2 mt-1">
@@ -57,7 +58,7 @@ const PortfolioWidget: React.FC<PortfolioWidgetProps> = ({ data }) => {
                         </span>
                     </div>
                 </div>
-                <div className="text-right max-w-[50%]">
+                <div className="text-left sm:text-right max-w-full sm:max-w-[50%]">
                     <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
                         "{attribution?.verdict}"
                     </p>

@@ -133,12 +133,15 @@ export interface PortfolioHealthReport {
   timestamp: number;
 }
 
-// Structured News Insight
+// Structured News/Analysis Insight (The Executive Briefing)
 export interface NewsInsight {
   gist: string;
+  verdict?: 'BUY' | 'SELL' | 'HOLD' | 'SAFE' | 'RISKY' | 'OVERVALUED' | 'UNDERVALUED' | 'NEUTRAL'; // New
   stats: Array<{ label: string; value: string }>;
   outlook: string;
   hypeScore: number; // 0-100
+  pros?: string[]; // New: The Good
+  cons?: string[]; // New: The Bad / Risks
   impact: {
     beneficiaries: string[];
     negativelyImpacted: string[];

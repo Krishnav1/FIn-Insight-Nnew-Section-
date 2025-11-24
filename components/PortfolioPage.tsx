@@ -37,21 +37,21 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({ onAuditClick }) => {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 animate-fade-in pb-20 sm:pb-8">
         
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 sm:mb-8">
             <div>
-                <h1 className="text-3xl font-bold text-theme-text mb-1">My Portfolio</h1>
-                <p className="text-theme-muted text-sm">Real-time valuation provided by CDSL/NSDL Link</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-theme-text mb-1">My Portfolio</h1>
+                <p className="text-theme-muted text-xs sm:text-sm">Real-time valuation provided by CDSL/NSDL Link</p>
             </div>
-            <div className="flex gap-3">
-                <button className="flex items-center gap-2 px-4 py-2 bg-theme-surface border border-theme-border text-theme-text rounded-xl hover:bg-theme-bg transition-all active:scale-95 font-medium text-sm shadow-sm">
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <button className="flex items-center justify-center gap-2 px-4 py-3 sm:py-2 bg-theme-surface border border-theme-border text-theme-text rounded-xl hover:bg-theme-bg transition-all active:scale-95 font-medium text-sm shadow-sm w-full sm:w-auto">
                     <RefreshCw size={16} /> Sync
                 </button>
                 <button 
                     onClick={onAuditClick}
-                    className="flex items-center gap-2 px-6 py-2 bg-theme-accent text-white rounded-xl hover:bg-theme-accent/90 transition-all active:scale-95 font-bold shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
+                    className="flex items-center justify-center gap-2 px-6 py-3 sm:py-2 bg-theme-accent text-white rounded-xl hover:bg-theme-accent/90 transition-all active:scale-95 font-bold shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 w-full sm:w-auto"
                 >
                     <BrainCircuit size={18} /> AI Audit
                 </button>
@@ -59,7 +59,7 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({ onAuditClick }) => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-8">
             {/* Net Worth */}
             <div className="p-6 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-xl relative overflow-hidden group hover:scale-[1.02] transition-transform duration-300">
                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
@@ -67,7 +67,7 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({ onAuditClick }) => {
                 </div>
                 <div className="relative z-10">
                     <p className="text-blue-100 text-sm font-medium mb-1">Net Worth</p>
-                    <h2 className="text-4xl font-mono font-bold">₹{totalValue.toLocaleString('en-IN', {maximumFractionDigits: 0})}</h2>
+                    <h2 className="text-3xl sm:text-4xl font-mono font-bold">₹{totalValue.toLocaleString('en-IN', {maximumFractionDigits: 0})}</h2>
                     <div className="flex items-center gap-2 mt-4 bg-white/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
                         {totalGain >= 0 ? <TrendingUp size={16} className="text-emerald-300"/> : <TrendingDown size={16} className="text-rose-300"/>}
                         <span className={`font-bold ${totalGain >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
@@ -114,20 +114,22 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({ onAuditClick }) => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Holdings Table */}
             <div className="lg:col-span-2 bg-theme-surface rounded-2xl border border-theme-border shadow-sm overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                <div className="p-6 border-b border-theme-border flex justify-between items-center">
+                <div className="p-4 sm:p-6 border-b border-theme-border flex justify-between items-center">
                     <h3 className="font-bold text-lg text-theme-text">Holdings</h3>
                     <span className="text-xs font-bold bg-theme-bg text-theme-muted px-2 py-1 rounded border border-theme-border">{MOCK_DETAILED_PORTFOLIO.length} Assets</span>
                 </div>
+                
+                {/* Scrollable Container for Mobile */}
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
+                    <table className="w-full text-sm text-left min-w-[800px]">
                         <thead className="bg-theme-bg text-theme-muted font-medium border-b border-theme-border">
                             <tr>
-                                <th className="px-6 py-3">Instrument</th>
-                                <th className="px-6 py-3">Sector</th>
-                                <th className="px-6 py-3 text-right">Qty</th>
-                                <th className="px-6 py-3 text-right">Current Price</th>
-                                <th className="px-6 py-3 text-right">Gain/Loss</th>
-                                <th className="px-6 py-3">AI Signal</th>
+                                <th className="px-6 py-3 whitespace-nowrap">Instrument</th>
+                                <th className="px-6 py-3 whitespace-nowrap">Sector</th>
+                                <th className="px-6 py-3 text-right whitespace-nowrap">Qty</th>
+                                <th className="px-6 py-3 text-right whitespace-nowrap">Price</th>
+                                <th className="px-6 py-3 text-right whitespace-nowrap">Gain/Loss</th>
+                                <th className="px-6 py-3 whitespace-nowrap">AI Signal</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-theme-border">
@@ -148,13 +150,13 @@ const PortfolioPage: React.FC<PortfolioPageProps> = ({ onAuditClick }) => {
                                             <div className="font-bold text-theme-text group-hover:text-theme-accent transition-colors">{item.symbol}</div>
                                             <div className="text-xs text-theme-muted">{item.name}</div>
                                         </td>
-                                        <td className="px-6 py-4 text-theme-text">{item.sector}</td>
+                                        <td className="px-6 py-4 text-theme-text whitespace-nowrap">{item.sector}</td>
                                         <td className="px-6 py-4 text-right font-mono text-theme-text">{item.shares}</td>
                                         <td className="px-6 py-4 text-right font-mono text-theme-text">₹{current.toLocaleString()}</td>
-                                        <td className={`px-6 py-4 text-right font-bold ${isProfit ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                        <td className={`px-6 py-4 text-right font-bold whitespace-nowrap ${isProfit ? 'text-emerald-500' : 'text-rose-500'}`}>
                                             {isProfit ? '+' : ''}{gain.toFixed(2)}%
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${signal.color}`}>
                                                 {signal.text}
                                             </span>

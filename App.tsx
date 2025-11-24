@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Article, 
@@ -31,8 +30,9 @@ import ThemeSelector from './components/ThemeSelector';
 import AuthModal from './components/AuthModal'; // New
 import ConnectPortfolioModal from './components/ConnectPortfolioModal'; // New
 import PortfolioPage from './components/PortfolioPage'; // New
+import MarketStories from './components/MarketStories'; // New
 
-import { Search, Menu, PieChart, Moon, Sun, RefreshCw, ShieldAlert, BrainCircuit, MessageSquare, Newspaper, Zap, Terminal, Settings, LogOut, Palette, ChevronLeft, ChevronRight, Home, Briefcase, Lock } from 'lucide-react';
+import { Search, Menu, PieChart, Moon, Sun, RefreshCw, ShieldAlert, BrainCircuit, MessageSquare, Newspaper, Zap, Terminal, Settings, LogOut, Palette, ChevronLeft, ChevronRight, Home, Briefcase, Lock, X } from 'lucide-react';
 
 // --- BRAND ASSETS ---
 const FININSIGHT_LOGO_URL = "logo.jpg"; 
@@ -44,6 +44,7 @@ const App: React.FC = () => {
   const [theme, setTheme] = useState<Theme>('dark');
   const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // --- Auth & Portfolio State ---
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -233,21 +234,17 @@ const App: React.FC = () => {
     }
   }, [loadingNews, articles.length, currentView]);
 
+  // Close mobile menu on view change
+  useEffect(() => {
+      setMobileMenuOpen(false);
+  }, [currentView]);
+
   // --- Handlers ---
 
   const handleLaunch = () => {
       // DEMO MODE: Bypass Auth
       setIsAuthenticated(true);
       setCurrentView('workspace');
-      
-      // Original Logic (Disabled for Demo)
-      /* 
-      if (!isAuthenticated) {
-          setIsAuthModalOpen(true);
-      } else {
-          setCurrentView('workspace');
-      }
-      */
   };
 
   const handlePortfolioNav = () => {
@@ -259,25 +256,11 @@ const App: React.FC = () => {
           return;
       }
       setCurrentView('portfolio');
-
-      // Original Logic (Disabled for Demo)
-      /*
-      if (!isAuthenticated) {
-          setIsAuthModalOpen(true);
-          return;
-      }
-      if (!hasConnectedPortfolio) {
-          setIsConnectModalOpen(true);
-          return;
-      }
-      setCurrentView('portfolio');
-      */
   };
 
   const handleLoginSuccess = () => {
       setIsAuthenticated(true);
       setIsAuthModalOpen(false);
-      // If user came from Launch, send to workspace. If specifically clicked portfolio, handle that logic next.
       setCurrentView('workspace');
   };
 
@@ -293,7 +276,6 @@ const App: React.FC = () => {
       // For now, we'll manually open the Sidebar in workspace mode with a portfolio prompt.
       setTimeout(() => {
          // This is a simplification. Ideally FinGeniePage would expose a method or context.
-         // Since we are changing views, we can just let the user type "/portfolio" or use the command.
       }, 500);
       sendMessage("Check portfolio health", "/portfolio");
       setSidebarOpen(true);
@@ -428,18 +410,41 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen bg-theme-bg text-theme-text font-sans overflow-hidden transition-colors duration-300">
       
-      {/* EXPANDED SIDEBAR NAVIGATION */}
-      <aside className={`flex-shrink-0 bg-theme-surface border-r border-theme-border flex flex-col transition-all duration-300 z-50 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
+      {/* MOBILE BACKDROP */}
+      {mobileMenuOpen && (
+        <div 
+            className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
+            onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* RESPONSIVE SIDEBAR NAVIGATION */}
+      <aside className={`
+          fixed inset-y-0 left-0 z-50 bg-theme-surface border-r border-theme-border flex flex-col transition-transform duration-300 md:relative
+          ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} 
+          md:translate-x-0 
+          ${isSidebarCollapsed ? 'md:w-20' : 'md:w-64'}
+          w-64
+      `}>
          
          {/* Logo Area */}
-         <div className="h-16 flex items-center gap-3 px-5 border-b border-theme-border">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex-shrink-0 flex items-center justify-center font-bold text-white text-xl shadow-lg">
-                F
+         <div className="h-16 flex items-center gap-3 px-5 border-b border-theme-border justify-between md:justify-start">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex-shrink-0 flex items-center justify-center font-bold text-white text-xl shadow-lg">
+                    F
+                </div>
+                <div className={`flex flex-col overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'md:w-0 md:opacity-0 md:hidden' : 'w-auto opacity-100'}`}>
+                    <span className="font-bold text-lg text-theme-text tracking-tight whitespace-nowrap">FinInsight</span>
+                    <span className="text-[10px] text-theme-muted uppercase tracking-wider whitespace-nowrap">Intelligence</span>
+                </div>
             </div>
-            <div className={`flex flex-col overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
-                <span className="font-bold text-lg text-theme-text tracking-tight whitespace-nowrap">FinInsight</span>
-                <span className="text-[10px] text-theme-muted uppercase tracking-wider whitespace-nowrap">Intelligence</span>
-            </div>
+            {/* Mobile Close Button */}
+            <button 
+                onClick={() => setMobileMenuOpen(false)} 
+                className="md:hidden text-theme-muted hover:text-theme-text p-1 hover:bg-theme-bg rounded-lg"
+            >
+                <X size={20} /> 
+            </button>
          </div>
 
          {/* Navigation Links */}
@@ -453,10 +458,10 @@ const App: React.FC = () => {
                 }`}
              >
                 <Terminal size={20} className="flex-shrink-0" />
-                <span className={`font-medium whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
+                <span className={`font-medium whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
                     Workspace
                 </span>
-                {currentView === 'workspace' && !isSidebarCollapsed && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-theme-accent"></div>}
+                {currentView === 'workspace' && !isSidebarCollapsed && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-theme-accent hidden md:block"></div>}
              </button>
              
              <button 
@@ -468,10 +473,10 @@ const App: React.FC = () => {
                 }`}
              >
                 {hasConnectedPortfolio ? <Briefcase size={20} className="flex-shrink-0" /> : <Lock size={20} className="flex-shrink-0" />}
-                <span className={`font-medium whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
+                <span className={`font-medium whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
                     My Portfolio
                 </span>
-                {currentView === 'portfolio' && !isSidebarCollapsed && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-theme-accent"></div>}
+                {currentView === 'portfolio' && !isSidebarCollapsed && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-theme-accent hidden md:block"></div>}
              </button>
 
              <button 
@@ -483,10 +488,10 @@ const App: React.FC = () => {
                 }`}
              >
                 <Newspaper size={20} className="flex-shrink-0" />
-                <span className={`font-medium whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
+                <span className={`font-medium whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
                     Market Pulse
                 </span>
-                {currentView === 'news' && !isSidebarCollapsed && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-theme-accent"></div>}
+                {currentView === 'news' && !isSidebarCollapsed && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-theme-accent hidden md:block"></div>}
              </button>
          </nav>
 
@@ -499,7 +504,7 @@ const App: React.FC = () => {
                     className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 text-theme-muted hover:bg-theme-bg hover:text-theme-text ${isThemeSelectorOpen ? 'bg-theme-bg text-theme-accent' : ''}`}
                  >
                     <Palette size={20} className="flex-shrink-0" />
-                    <span className={`font-medium whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
+                    <span className={`font-medium whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
                         Appearance
                     </span>
                  </button>
@@ -521,15 +526,15 @@ const App: React.FC = () => {
                 title="Logout"
              >
                 <LogOut size={20} className="flex-shrink-0" />
-                <span className={`font-medium whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>
+                <span className={`font-medium whitespace-nowrap transition-opacity duration-300 ${isSidebarCollapsed ? 'md:opacity-0 md:w-0 md:hidden' : 'opacity-100'}`}>
                     Log Out
                 </span>
              </button>
              
-             {/* Sidebar Toggle */}
+             {/* Sidebar Toggle (Desktop Only) */}
              <button 
                 onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                className="w-full flex items-center justify-center p-2 text-theme-muted hover:text-theme-text hover:bg-theme-bg rounded-lg mt-2"
+                className="hidden md:flex w-full items-center justify-center p-2 text-theme-muted hover:text-theme-text hover:bg-theme-bg rounded-lg mt-2"
              >
                  {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
              </button>
@@ -539,20 +544,32 @@ const App: React.FC = () => {
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0 relative bg-theme-bg">
         {/* Top Bar (Contextual) */}
-        <header className="h-16 border-b border-theme-border bg-theme-bg/95 backdrop-blur-sm flex items-center justify-between px-6 sticky top-0 z-30">
-            <div>
-                <h2 className="text-xl font-bold text-theme-text flex items-center gap-2">
-                    {currentView === 'workspace' && <Terminal size={20} className="text-theme-accent"/>}
-                    {currentView === 'news' && <Newspaper size={20} className="text-theme-accent"/>}
-                    {currentView === 'portfolio' && <Briefcase size={20} className="text-theme-accent"/>}
-                    {currentView === 'workspace' ? 'FinGenie Workspace' : currentView === 'portfolio' ? 'My Portfolio' : 'Market Pulse'}
-                </h2>
-                <p className="text-xs text-theme-muted font-mono mt-0.5">
-                    {currentView === 'workspace' ? 'AI ANALYST • ONLINE' : currentView === 'portfolio' ? 'NSDL LINKED • ACTIVE' : 'REAL-TIME INTELLIGENCE FEED'}
-                </p>
+        <header className="h-16 border-b border-theme-border bg-theme-bg/95 backdrop-blur-sm flex items-center justify-between px-4 sm:px-6 sticky top-0 z-30">
+            <div className="flex items-center gap-3">
+                {/* Mobile Menu Button */}
+                <button 
+                    onClick={() => setMobileMenuOpen(true)}
+                    className="p-2 -ml-2 mr-1 text-theme-muted hover:text-theme-text md:hidden rounded-lg hover:bg-theme-surface"
+                >
+                    <Menu size={24} />
+                </button>
+
+                <div>
+                    <h2 className="text-lg sm:text-xl font-bold text-theme-text flex items-center gap-2">
+                        {currentView === 'workspace' && <Terminal size={20} className="text-theme-accent"/>}
+                        {currentView === 'news' && <Newspaper size={20} className="text-theme-accent"/>}
+                        {currentView === 'portfolio' && <Briefcase size={20} className="text-theme-accent"/>}
+                        <span className="truncate max-w-[150px] sm:max-w-none">
+                            {currentView === 'workspace' ? 'FinGenie Workspace' : currentView === 'portfolio' ? 'My Portfolio' : 'Market Pulse'}
+                        </span>
+                    </h2>
+                    <p className="text-xs text-theme-muted font-mono mt-0.5 hidden sm:block">
+                        {currentView === 'workspace' ? 'AI ANALYST • ONLINE' : currentView === 'portfolio' ? 'NSDL LINKED • ACTIVE' : 'REAL-TIME INTELLIGENCE FEED'}
+                    </p>
+                </div>
             </div>
-            <div className="flex items-center gap-6">
-                <div className="hidden md:block w-96">
+            <div className="flex items-center gap-4 sm:gap-6">
+                <div className="hidden md:block w-72 lg:w-96">
                     <StockTicker />
                 </div>
                 <div className="flex items-center gap-3">
@@ -577,7 +594,7 @@ const App: React.FC = () => {
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
                         <div>
-                            <h1 className="text-3xl font-bold text-theme-text mb-2 flex items-center gap-3">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-theme-text mb-2 flex items-center gap-3">
                                 Market Pulse
                                 <button 
                                     onClick={() => loadData(false)}
@@ -587,16 +604,19 @@ const App: React.FC = () => {
                                     <RefreshCw size={18} />
                                 </button>
                             </h1>
-                            <p className="text-theme-muted">
+                            <p className="text-theme-muted text-sm sm:text-base">
                                 Real-time feed filtered for your portfolio and trending topics.
                             </p>
                         </div>
                         
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide">
                             <SortControls currentSort={sortOption} onSortChange={setSortOption} />
                             <LayoutToggle mode={layoutMode} onChange={setLayoutMode} />
                         </div>
                     </div>
+
+                    {/* Stories Feature */}
+                    <MarketStories articles={articles} />
 
                     {/* Tabs */}
                     <div className="flex border-b border-theme-border mb-6 overflow-x-auto scrollbar-hide">
