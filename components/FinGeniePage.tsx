@@ -1,15 +1,14 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Send, Plus, X, FileText, Phone, AlertOctagon, Activity, Search, Factory, BrainCircuit, BarChart2, Shield, Scale, ChevronDown, ChevronUp, Zap, HelpCircle, TrendingUp, TrendingDown, DollarSign, MousePointer2, Terminal, Building2, Globe, Sparkles, ExternalLink, MessageSquare, CheckCircle2, Copy, ThumbsUp, ThumbsDown, BookOpen } from 'lucide-react';
+import { Send, Plus, X, FileText, Phone, AlertOctagon, Activity, Search, Factory, BrainCircuit, BarChart2, Shield, Scale, ChevronDown, ChevronUp, Zap, HelpCircle, TrendingUp, TrendingDown, DollarSign, MousePointer2, Terminal, Building2, Globe, Sparkles, ExternalLink, MessageSquare, CheckCircle2, Copy, ThumbsUp, ThumbsDown, BookOpen, Trophy, ShieldCheck, ShieldAlert, Gauge, ArrowUpRight, ArrowDownRight, AlertTriangle } from 'lucide-react';
 import { ChatMessage, TickerSearchItem, DocumentType, PinnedItem, EvidenceDocument, BingoData, SourceLink, NewsInsight } from '../types';
-import { startChatSession, sendChatMessage, analyzeDocument, getPortfolioHealthReport } from '../services/geminiService';
+import { startChatSession, sendChatMessage, analyzeDocument, getPortfolioHealthReport, fetchLiveNews } from '../services/geminiService';
 import { USER_PORTFOLIO, SEARCHABLE_TICKERS, MACROS, COMMANDS } from '../constants';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import DynamicChart from './DynamicChart';
 import DominoGraph from './DominoGraph';
 import PortfolioWidget from './PortfolioWidget';
-import { fetchLiveNews } from '../services/geminiService';
 import TickerChip from './TickerChip';
 import QuickPeekDrawer from './QuickPeekDrawer';
 
@@ -25,6 +24,31 @@ interface WorkspaceTab {
     messages: ChatMessage[];
     evidence?: EvidenceDocument | null;
 }
+
+// --- HELPER COMPONENT MOVED OUTSIDE ---
+const TickerChipWrapper = ({ text, onClick }: { text: string, onClick: (ticker: string) => void }) => {
+    const tickers = SEARCHABLE_TICKERS.map(t => t.symbol);
+    
+    const escapedTickers = tickers
+        .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .sort((a, b) => b.length - a.length);
+
+    if (escapedTickers.length === 0) return <>{text}</>;
+
+    const regex = new RegExp(`\\b(${escapedTickers.join('|')})\\b`, 'g');
+    const parts = text.split(regex);
+
+    return (
+        <>
+            {parts.map((part, i) => {
+                if (tickers.includes(part)) {
+                    return <TickerChip key={i} ticker={part} onClick={onClick} />;
+                }
+                return part;
+            })}
+        </>
+    );
+};
 
 // --- SUB-COMPONENTS ---
 
@@ -128,99 +152,268 @@ const ReasoningAccordion = ({ thoughts }: { thoughts: string }) => {
     );
 }
 
+// --- SPECIALIZED TEMPLATE CARDS ---
+
+const BattleCard = ({ data }: { data: NewsInsight['battle'] }) => {
+    if (!data) return null;
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-theme-border shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-theme-border bg-gradient-to-r from-orange-50 to-transparent dark:from-orange-900/20 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <Scale size={18} className="text-orange-500" />
+                    <h4 className="text-sm font-bold text-theme-text uppercase tracking-wide">Head-to-Head</h4>
+                </div>
+                <div className="flex items-center gap-2 bg-orange-100 dark:bg-orange-900/40 px-3 py-1 rounded-full border border-orange-200 dark:border-orange-800">
+                    <Trophy size={14} className="text-orange-600 dark:text-orange-400" />
+                    <span className="text-xs font-bold text-orange-800 dark:text-orange-300">Winner: {data.winner}</span>
+                </div>
+            </div>
+            
+            <div className="p-0">
+                <table className="w-full text-sm text-left">
+                    <thead className="bg-theme-surface text-xs text-theme-muted uppercase">
+                        <tr>
+                            <th className="px-4 py-3 font-medium">Metric</th>
+                            <th className="px-4 py-3 font-bold text-theme-text">{data.winner} <span className="text-[9px] font-normal text-theme-muted">(Winner)</span></th>
+                            <th className="px-4 py-3 font-medium text-theme-text opacity-70">{data.loser}</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-theme-border">
+                        {data.metrics.map((m, i) => (
+                            <tr key={i} className="hover:bg-theme-surface/50 transition-colors">
+                                <td className="px-4 py-3 text-theme-muted font-medium">{m.label}</td>
+                                <td className={`px-4 py-3 font-mono font-bold ${m.winnerFavored ? 'text-emerald-600 dark:text-emerald-400' : 'text-theme-text'}`}>
+                                    {m.winnerValue}
+                                </td>
+                                <td className={`px-4 py-3 font-mono ${!m.winnerFavored ? 'text-emerald-600 dark:text-emerald-400' : 'text-theme-muted'}`}>
+                                    {m.loserValue}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+const ValuationCard = ({ data }: { data: NewsInsight['valuation'] }) => {
+    if (!data) return null;
+    const isUndervalued = data.status === 'Undervalued';
+    const color = isUndervalued ? 'text-emerald-500' : data.status === 'Overvalued' ? 'text-rose-500' : 'text-amber-500';
+    const bgColor = isUndervalued ? 'bg-emerald-50 dark:bg-emerald-900/20' : data.status === 'Overvalued' ? 'bg-rose-50 dark:bg-rose-900/20' : 'bg-amber-50 dark:bg-amber-900/20';
+
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-theme-border shadow-sm overflow-hidden">
+            <div className={`p-4 border-b border-theme-border ${bgColor} flex justify-between items-center`}>
+                <div className="flex items-center gap-2">
+                    <Gauge size={18} className={color} />
+                    <h4 className={`text-sm font-bold uppercase tracking-wide ${color}`}>Valuation Check</h4>
+                </div>
+                <span className={`text-xs font-black px-2 py-1 rounded border border-current ${color} bg-white/50 dark:bg-black/20`}>
+                    {data.status.toUpperCase()}
+                </span>
+            </div>
+            
+            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="flex flex-col justify-center items-center text-center border-r border-theme-border pr-6">
+                    <div className="text-xs text-theme-muted uppercase font-bold mb-1">Estimated Fair Value</div>
+                    <div className={`text-3xl font-black ${color}`}>₹{data.fairValue}</div>
+                    <div className="flex items-center gap-1 text-sm font-medium text-theme-text mt-2">
+                        <span>Current: ₹{data.currentPrice}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${bgColor} ${color} font-bold`}>
+                            {data.upside}
+                        </span>
+                    </div>
+                </div>
+                <div>
+                    <h5 className="text-xs font-bold text-theme-muted uppercase mb-3">Why this price?</h5>
+                    <ul className="space-y-2">
+                        {data.justification.map((j, i) => (
+                            <li key={i} className="flex items-start gap-2 text-xs text-theme-text">
+                                <CheckCircle2 size={12} className={`mt-0.5 shrink-0 ${color}`} />
+                                <span>{j}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ForensicCard = ({ data }: { data: NewsInsight['forensic'] }) => {
+    if (!data) return null;
+    const isSafe = data.score > 70;
+    const isCritical = data.score < 40;
+    const color = isSafe ? 'text-emerald-600 dark:text-emerald-400' : isCritical ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400';
+    const Icon = isSafe ? ShieldCheck : isCritical ? ShieldAlert : AlertTriangle;
+
+    return (
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-theme-border shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-theme-border bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                    <Search size={18} className="text-purple-500" />
+                    <h4 className="text-sm font-bold text-theme-text uppercase tracking-wide">Forensic Scan</h4>
+                </div>
+                <div className="text-xs text-theme-muted font-mono">Auditor: {data.auditorNote || 'Unknown'}</div>
+            </div>
+
+            <div className="p-5">
+                <div className="flex items-center gap-4 mb-6">
+                    <div className={`w-16 h-16 rounded-full border-4 flex items-center justify-center ${isSafe ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800' : isCritical ? 'border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800' : 'border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800'}`}>
+                        <Icon size={32} className={color} />
+                    </div>
+                    <div>
+                        <div className="text-xs text-theme-muted uppercase font-bold">Safety Score</div>
+                        <div className={`text-3xl font-black ${color}`}>{data.score}/100</div>
+                        <div className={`text-xs font-bold ${color}`}>{data.status.toUpperCase()}</div>
+                    </div>
+                </div>
+
+                <div>
+                    <h5 className="text-xs font-bold text-theme-muted uppercase mb-3 border-b border-theme-border pb-1">Red Flags Detected</h5>
+                    {data.redFlags.length === 0 ? (
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-900/10 rounded-lg border border-emerald-100 dark:border-emerald-800 flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300">
+                            <CheckCircle2 size={14} /> No major red flags found in this document.
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {data.redFlags.map((flag, i) => (
+                                <div key={i} className="p-3 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-800/50">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-xs font-bold text-red-700 dark:text-red-400">{flag.title}</span>
+                                        <span className="text-[10px] px-1.5 py-0.5 bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 rounded uppercase font-bold">{flag.severity}</span>
+                                    </div>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 leading-tight">{flag.desc}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- MAIN SMART CARD ---
+
 const SmartInsightCard = ({ data }: { data: NewsInsight }) => {
     const getVerdictColor = (v: string) => {
-        if (['SAFE', 'BUY', 'UNDERVALUED', 'STRONG'].includes(v)) return 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400';
+        if (['SAFE', 'BUY', 'UNDERVALUED', 'STRONG', 'WINNER'].includes(v)) return 'text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400';
         if (['RISKY', 'SELL', 'OVERVALUED', 'WEAK'].includes(v)) return 'text-red-600 bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400';
         return 'text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400';
     };
 
     const verdictColorClass = data.verdict ? getVerdictColor(data.verdict) : '';
+    
+    // Determine template
+    const template = data.template || 'general';
 
     return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-theme-border shadow-lg overflow-hidden mb-6 animate-fade-in">
-            {/* Executive Summary Header */}
-            <div className="p-5 border-b border-theme-border bg-gradient-to-r from-theme-surface to-transparent">
-                <div className="flex justify-between items-start mb-3">
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="p-1.5 bg-theme-accent/10 text-theme-accent rounded-lg">
-                                <Activity size={16} />
-                            </span>
-                            <h4 className="text-xs font-bold text-theme-muted uppercase tracking-widest">Executive Briefing</h4>
+        <div className="space-y-4 animate-fade-in">
+            
+            {/* 1. SPECIALIZED TEMPLATE CARD (If applicable) */}
+            {template === 'battle' && data.battle && <BattleCard data={data.battle} />}
+            {template === 'valuation' && data.valuation && <ValuationCard data={data.valuation} />}
+            {template === 'forensic' && data.forensic && <ForensicCard data={data.forensic} />}
+
+            {/* 2. GENERAL SUMMARY CARD (Always shown for context, slightly modified if template used) */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-theme-border shadow-lg overflow-hidden">
+                {/* Executive Summary Header */}
+                <div className="p-5 border-b border-theme-border bg-gradient-to-r from-theme-surface to-transparent">
+                    <div className="flex justify-between items-start mb-3">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="p-1.5 bg-theme-accent/10 text-theme-accent rounded-lg">
+                                    <Activity size={16} />
+                                </span>
+                                <h4 className="text-xs font-bold text-theme-muted uppercase tracking-widest">
+                                    {template === 'general' ? 'Executive Briefing' : 'Analyst Note'}
+                                </h4>
+                            </div>
+                            <p className="text-base font-bold text-theme-text leading-tight mt-1">
+                                {data.gist}
+                            </p>
                         </div>
-                        <p className="text-base font-bold text-theme-text leading-tight mt-1">
-                            {data.gist}
-                        </p>
+                        {/* Only show generic verdict badge if NOT using a specialized card that already has one */}
+                        {data.verdict && template === 'general' && (
+                            <div className={`px-3 py-1.5 rounded-lg border font-black text-xs uppercase tracking-wide shadow-sm flex-shrink-0 ml-2 ${verdictColorClass}`}>
+                                {data.verdict}
+                            </div>
+                        )}
                     </div>
-                    {data.verdict && (
-                        <div className={`px-3 py-1.5 rounded-lg border font-black text-xs uppercase tracking-wide shadow-sm flex-shrink-0 ml-2 ${verdictColorClass}`}>
-                            {data.verdict}
+                    
+                    {/* Low Confidence Warning */}
+                    {data.confidenceScore !== undefined && data.confidenceScore < 70 && (
+                        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-400">
+                            <AlertTriangle size={12} />
+                            <span><strong>Low Confidence:</strong> Some financial data might be missing or estimated. Verify independently.</span>
                         </div>
                     )}
                 </div>
-            </div>
 
-            {/* Pros & Cons Grid - Stacks on Mobile */}
-            {(data.pros || data.cons) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-theme-border border-b border-theme-border">
-                    <div className="p-4 bg-emerald-50/30 dark:bg-emerald-900/5">
-                        <h5 className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase mb-3 flex items-center gap-1.5">
-                            <CheckCircle2 size={12}/> The Good
-                        </h5>
-                        <ul className="space-y-2">
-                            {(data.pros || []).map((pro, i) => (
-                                <li key={i} className="text-xs text-theme-text flex items-start gap-2">
-                                    <span className="mt-1 w-1 h-1 rounded-full bg-emerald-500 flex-shrink-0"></span>
-                                    <span className="leading-relaxed">{pro}</span>
-                                </li>
-                            ))}
-                            {!data.pros?.length && <li className="text-xs text-theme-muted italic">No major positives.</li>}
-                        </ul>
+                {/* Key Metrics Grid (Only for General Template or if stats exist and not covered by specialized card) */}
+                {template === 'general' && data.stats && data.stats.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 divide-x divide-y divide-theme-border border-b border-theme-border bg-theme-surface/30">
+                        {data.stats.map((stat, i) => (
+                            <div key={i} className="p-3 text-center hover:bg-theme-surface transition-colors">
+                                <div className="text-[10px] text-theme-muted uppercase font-bold mb-1">{stat.label}</div>
+                                <div className="text-sm font-mono font-bold text-theme-text">{stat.value}</div>
+                            </div>
+                        ))}
                     </div>
-                    <div className="p-4 bg-rose-50/30 dark:bg-rose-900/5">
-                        <h5 className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase mb-3 flex items-center gap-1.5">
-                            <AlertOctagon size={12}/> The Bad / Risks
-                        </h5>
-                        <ul className="space-y-2">
-                            {(data.cons || []).map((con, i) => (
-                                <li key={i} className="text-xs text-theme-text flex items-start gap-2">
-                                    <span className="mt-1 w-1 h-1 rounded-full bg-rose-500 flex-shrink-0"></span>
-                                    <span className="leading-relaxed">{con}</span>
-                                </li>
-                            ))}
-                            {!data.cons?.length && <li className="text-xs text-theme-muted italic">No major risks detected.</li>}
-                        </ul>
-                    </div>
-                </div>
-            )}
+                )}
 
-            {/* Key Metrics Grid - Responsive */}
-            {data.stats && data.stats.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 divide-x divide-y divide-theme-border border-b border-theme-border bg-theme-surface/30">
-                    {data.stats.map((stat, i) => (
-                        <div key={i} className="p-3 text-center hover:bg-theme-surface transition-colors">
-                            <div className="text-[10px] text-theme-muted uppercase font-bold mb-1">{stat.label}</div>
-                            <div className="text-sm font-mono font-bold text-theme-text">{stat.value}</div>
+                {/* Pros & Cons Grid */}
+                {template !== 'battle' && (data.pros?.length || 0) + (data.cons?.length || 0) > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-theme-border border-b border-theme-border">
+                        <div className="p-4 bg-emerald-50/30 dark:bg-emerald-900/5">
+                            <h5 className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase mb-3 flex items-center gap-1.5">
+                                <ArrowUpRight size={12}/> The Good
+                            </h5>
+                            <ul className="space-y-2">
+                                {(data.pros || []).map((pro, i) => (
+                                    <li key={i} className="text-xs text-theme-text flex items-start gap-2">
+                                        <span className="mt-1 w-1 h-1 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                                        <span className="leading-relaxed">{pro}</span>
+                                    </li>
+                                ))}
+                                {(!data.pros || data.pros.length === 0) && <li className="text-xs text-theme-muted italic">No major positives.</li>}
+                            </ul>
                         </div>
-                    ))}
-                </div>
-            )}
-
-            {/* Hype Meter */}
-            <div className="p-4 bg-theme-bg flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-bold text-theme-muted uppercase">
-                    <Zap size={12} className={data.hypeScore > 50 ? "text-theme-accent" : "text-gray-400"}/>
-                    Hype Meter
-                </div>
-                <div className="flex items-center gap-3 flex-1 max-w-[200px]">
-                    <div className="h-1.5 w-full bg-theme-border rounded-full overflow-hidden">
-                        <div 
-                            className={`h-full rounded-full ${data.hypeScore > 70 ? 'bg-rose-500' : data.hypeScore > 40 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
-                            style={{ width: `${data.hypeScore}%` }}
-                        />
+                        <div className="p-4 bg-rose-50/30 dark:bg-rose-900/5">
+                            <h5 className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase mb-3 flex items-center gap-1.5">
+                                <ArrowDownRight size={12}/> The Bad / Risks
+                            </h5>
+                            <ul className="space-y-2">
+                                {(data.cons || []).map((con, i) => (
+                                    <li key={i} className="text-xs text-theme-text flex items-start gap-2">
+                                        <span className="mt-1 w-1 h-1 rounded-full bg-rose-500 flex-shrink-0"></span>
+                                        <span className="leading-relaxed">{con}</span>
+                                    </li>
+                                ))}
+                                {(!data.cons || data.cons.length === 0) && <li className="text-xs text-theme-muted italic">No major risks detected.</li>}
+                            </ul>
+                        </div>
                     </div>
-                    <span className="text-xs font-mono font-bold text-theme-text">{data.hypeScore}/100</span>
+                )}
+
+                {/* Hype Meter (Common Footer) */}
+                <div className="p-4 bg-theme-bg flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold text-theme-muted uppercase">
+                        <Zap size={12} className={data.hypeScore > 50 ? "text-theme-accent" : "text-gray-400"}/>
+                        Hype Meter
+                    </div>
+                    <div className="flex items-center gap-3 flex-1 max-w-[200px]">
+                        <div className="h-1.5 w-full bg-theme-border rounded-full overflow-hidden">
+                            <div 
+                                className={`h-full rounded-full ${data.hypeScore > 70 ? 'bg-rose-500' : data.hypeScore > 40 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
+                                style={{ width: `${data.hypeScore}%` }}
+                            />
+                        </div>
+                        <span className="text-xs font-mono font-bold text-theme-text">{data.hypeScore}/100</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -569,9 +762,6 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
   const [activeWizard, setActiveWizard] = useState<WizardType | null>(null);
   const [quickPeekTicker, setQuickPeekTicker] = useState<string | null>(null);
   
-  // Search Highlight
-  const [searchTerm, setSearchTerm] = useState('');
-
   // Auto-scroll
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -786,6 +976,7 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
               chartData: result.chartData,
               dominoData: result.dominoData,
               insightData: result.insightData,
+              forensicData: result.forensicData,
               timestamp: Date.now()
           };
           
@@ -836,7 +1027,7 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
       });
 
       try {
-          const { text, thoughts, sentiment, chartData, bingoData, dominoData, sourceDocument, sources, followUp, insightData } = await analyzeDocument(ticker, docType);
+          const { text, thoughts, sentiment, chartData, bingoData, dominoData, sourceDocument, sources, followUp, insightData, forensicData } = await analyzeDocument(ticker, docType);
           
           setTabs(prev => prev.map(t => {
               if (t.id === activeTabId) {
@@ -858,6 +1049,7 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                           chartData,
                           dominoData,
                           insightData,
+                          forensicData,
                           sources,
                           followUp,
                           timestamp: Date.now()
@@ -873,37 +1065,6 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
           setLoading(false);
       }
   };
-
-  // Helper to safely render markdown children without [object Object] bug
-  const renderChildren = (children: React.ReactNode) => {
-      return React.Children.map(children, child => {
-          if (typeof child === 'string') {
-              return <TickerChipWrapper text={child} />;
-          }
-          return child;
-      });
-  };
-
-  // Helper component for ticker chips in text
-  const TickerChipWrapper = ({ text }: { text: string }) => {
-    const tickers = SEARCHABLE_TICKERS.map(t => t.symbol);
-    const escapedTickers = tickers.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).sort((a, b) => b.length - a.length);
-    if (escapedTickers.length === 0) return <>{text}</>;
-    
-    const regex = new RegExp(`\\b(${escapedTickers.join('|')})\\b`, 'g');
-    const parts = text.split(regex);
-    
-    return (
-        <>
-            {parts.map((part, i) => {
-                if (tickers.includes(part)) {
-                    return <TickerChip key={i} ticker={part} onClick={setQuickPeekTicker} />;
-                }
-                return part;
-            })}
-        </>
-    );
-  }
 
   return (
     <div className="flex h-full bg-theme-bg text-theme-text font-sans overflow-hidden">
@@ -985,263 +1146,206 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
                                  ) : (
                                      <div className="bg-white/80 dark:bg-[#121820]/90 backdrop-blur-sm rounded-2xl rounded-tl-sm border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
                                          {/* Header Strip */}
-                                         <div className="h-1 w-full bg-gradient-to-r from-theme-accent via-purple-500 to-transparent opacity-50"></div>
+                                         <div className="h-1 w-full bg-gradient-to-r from-theme-accent to-purple-500 opacity-50"></div>
                                          
-                                         <div className="p-4 sm:p-6 space-y-5">
-                                             {/* Chain of Thought UI */}
+                                         <div className="p-5">
+                                             {/* Thinking Process */}
                                              {msg.thoughts && <ReasoningAccordion thoughts={msg.thoughts} />}
 
-                                             {/* Structured Insight Card (Executive Summary) */}
+                                             {/* Polymorphic Insight Card */}
                                              {msg.insightData && <SmartInsightCard data={msg.insightData} />}
-
-                                             {/* Text Content - Collapsible if Card exists */}
-                                             {msg.text && (
-                                                 msg.insightData ? (
-                                                     <details className="group/details">
-                                                         <summary className="flex items-center gap-2 cursor-pointer text-xs font-bold text-theme-muted hover:text-theme-accent transition-colors py-2 select-none">
-                                                             <BookOpen size={14} /> Read Detailed Report
-                                                             <ChevronDown size={12} className="transition-transform group-open/details:rotate-180" />
-                                                         </summary>
-                                                         <div className="mt-3 pl-4 border-l-2 border-theme-border/50 prose dark:prose-invert prose-sm max-w-none text-theme-text/90 animate-slide-up">
-                                                             <ReactMarkdown 
-                                                                remarkPlugins={[remarkGfm]}
-                                                                components={{
-                                                                    p: ({node, ...props}) => <p className="leading-relaxed mb-4 last:mb-0" {...props}>{renderChildren(props.children)}</p>,
-                                                                    li: ({node, ...props}) => (
-                                                                        <li className="flex gap-2.5 mb-2" {...props}>
-                                                                            <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-theme-accent shrink-0"></div>
-                                                                            <div>{renderChildren(props.children)}</div>
-                                                                        </li>
-                                                                    ),
-                                                                    strong: ({node, ...props}) => <strong className="font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1 rounded mx-0.5 inline-block" {...props} />,
-                                                                    table: ({node, ...props}) => <div className="overflow-x-auto my-4 rounded-xl border border-theme-border shadow-sm"><table className="w-full text-sm" {...props} /></div>,
-                                                                    thead: ({node, ...props}) => <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-bold text-theme-muted" {...props} />,
-                                                                    th: ({node, ...props}) => <th className="px-4 py-3 text-left border-b border-theme-border whitespace-nowrap" {...props} />,
-                                                                    td: ({node, ...props}) => <td className="px-4 py-3 border-b border-theme-border/50 text-theme-text" {...props} />,
-                                                                    blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-theme-accent pl-4 italic text-theme-muted my-4" {...props} />
-                                                                }}
-                                                            >
-                                                                {msg.text}
-                                                            </ReactMarkdown>
-                                                         </div>
-                                                     </details>
-                                                 ) : (
-                                                     <div className="prose dark:prose-invert prose-sm max-w-none text-theme-text/90">
-                                                        <ReactMarkdown 
-                                                            remarkPlugins={[remarkGfm]}
-                                                            components={{
-                                                                p: ({node, ...props}) => <p className="leading-relaxed mb-4 last:mb-0" {...props}>{renderChildren(props.children)}</p>,
-                                                                li: ({node, ...props}) => (
-                                                                    <li className="flex gap-2.5 mb-2" {...props}>
-                                                                        <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-theme-accent shrink-0"></div>
-                                                                        <div>{renderChildren(props.children)}</div>
-                                                                    </li>
-                                                                ),
-                                                                strong: ({node, ...props}) => <strong className="font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1 rounded mx-0.5 inline-block" {...props} />,
-                                                                table: ({node, ...props}) => <div className="overflow-x-auto my-4 rounded-xl border border-theme-border shadow-sm"><table className="w-full text-sm" {...props} /></div>,
-                                                                thead: ({node, ...props}) => <thead className="bg-gray-50 dark:bg-gray-800/50 text-xs uppercase font-bold text-theme-muted" {...props} />,
-                                                                th: ({node, ...props}) => <th className="px-4 py-3 text-left border-b border-theme-border whitespace-nowrap" {...props} />,
-                                                                td: ({node, ...props}) => <td className="px-4 py-3 border-b border-theme-border/50 text-theme-text" {...props} />,
-                                                                blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-theme-accent pl-4 italic text-theme-muted my-4" {...props} />
-                                                            }}
-                                                        >
-                                                            {msg.text}
-                                                        </ReactMarkdown>
-                                                     </div>
-                                                 )
-                                             )}
-
-                                             {/* Citations / Sources - IMPROVED UI */}
-                                             {msg.sources && msg.sources.length > 0 && <SourceChips sources={msg.sources} />}
-
-                                             {/* Dynamic Widgets */}
-                                             {msg.chartData && <div className="mt-6"><DynamicChart data={msg.chartData} /></div>}
-                                             {msg.dominoData && <div className="mt-6"><DominoGraph data={msg.dominoData} targetTicker="Target" /></div>}
-                                             {msg.portfolioReport && <div className="mt-6"><PortfolioWidget data={msg.portfolioReport} /></div>}
                                              
-                                             {/* Sentiment Gauge */}
-                                             {msg.sentimentScore !== undefined && !msg.insightData && (
-                                                <div className="flex items-center justify-between pt-4 mt-4 border-t border-theme-border/50">
-                                                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-bg border border-theme-border text-xs font-bold">
-                                                         <Activity size={14} className={msg.sentimentScore > 0 ? 'text-emerald-500' : 'text-rose-500'} />
-                                                         Market Sentiment: 
-                                                         <span className={msg.sentimentScore > 0 ? 'text-emerald-500' : 'text-rose-500'}>
-                                                             {msg.sentimentScore > 0 ? 'Bullish' : 'Bearish'} ({msg.sentimentScore > 0 ? '+' : ''}{msg.sentimentScore})
-                                                         </span>
-                                                     </div>
-                                                     <div className="flex gap-2">
-                                                         <button className="p-1.5 text-theme-muted hover:text-theme-text transition-colors"><Copy size={14}/></button>
-                                                     </div>
-                                                </div>
+                                             {/* Fallback / Detailed Text */}
+                                             {(!msg.insightData || msg.text.length > 100) && (
+                                                 <div className="prose dark:prose-invert prose-sm max-w-none leading-relaxed text-theme-text/90">
+                                                     <ReactMarkdown 
+                                                        remarkPlugins={[remarkGfm]}
+                                                        components={{
+                                                            // Override p to parse for tickers safely calling the external wrapper
+                                                            p: ({node, ...props}) => <p className="mb-4 last:mb-0" {...props}><TickerChipWrapper text={String(props.children)} onClick={setQuickPeekTicker} /></p>,
+                                                            li: ({node, ...props}) => <li className="my-1" {...props}><TickerChipWrapper text={String(props.children)} onClick={setQuickPeekTicker} /></li>
+                                                        }}
+                                                     >
+                                                         {msg.text}
+                                                     </ReactMarkdown>
+                                                 </div>
                                              )}
 
-                                             {/* Suggested Follow-Ups */}
-                                             {msg.followUp && msg.followUp.length > 0 && (
-                                                 <FollowUpSuggestions 
-                                                    questions={msg.followUp} 
-                                                    onSelect={(q) => handleSendMessage(q)} 
-                                                 />
-                                             )}
+                                             {/* Rich Media Blocks */}
+                                             {msg.chartData && <DynamicChart data={msg.chartData} />}
+                                             {msg.dominoData && <DominoGraph data={msg.dominoData} targetTicker={activeTab.ticker || 'Target'} />}
+                                             {msg.portfolioReport && <PortfolioWidget data={msg.portfolioReport} />}
+                                             {msg.forensicData && !msg.insightData && <ForensicCard data={{
+                                                 score: msg.forensicData.manipulationScore,
+                                                 status: msg.forensicData.manipulationScore > 70 ? 'Clean' : 'Concern',
+                                                 redFlags: msg.forensicData.redFlags.map(f => ({ title: f.flag, severity: f.severity === 'Critical' ? 'High' : 'Medium', desc: f.explanation })),
+                                                 auditorNote: 'See Annual Report'
+                                             }} />}
+
+                                             {/* Footer Actions */}
+                                             <div className="mt-6 pt-4 border-t border-theme-border/50 flex flex-col gap-4">
+                                                 {/* Follow Ups */}
+                                                 {msg.followUp && msg.followUp.length > 0 && (
+                                                     <FollowUpSuggestions 
+                                                        questions={msg.followUp} 
+                                                        onSelect={(q) => handleSendMessage(q)} 
+                                                     />
+                                                 )}
+                                                 
+                                                 {/* Sources */}
+                                                 {msg.sources && msg.sources.length > 0 && (
+                                                     <SourceChips sources={msg.sources} />
+                                                 )}
+
+                                                 {/* Interaction Bar */}
+                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                                     <button className="p-1.5 rounded-lg hover:bg-theme-surface text-theme-muted hover:text-theme-text transition-colors"><Copy size={14}/></button>
+                                                     <button className="p-1.5 rounded-lg hover:bg-theme-surface text-theme-muted hover:text-theme-text transition-colors"><ThumbsUp size={14}/></button>
+                                                     <button className="p-1.5 rounded-lg hover:bg-theme-surface text-theme-muted hover:text-theme-text transition-colors"><ThumbsDown size={14}/></button>
+                                                 </div>
+                                             </div>
                                          </div>
                                      </div>
                                  )}
+                                 <span className="text-[10px] text-theme-muted mt-2 block px-2 font-mono">
+                                     {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                 </span>
                              </div>
                          </div>
                     ))
                 )}
-                {loading && <ContextAwareLoading lastUserMessage={activeTab.messages.filter(m => m.role === 'user').pop()?.text} />}
                 
-                {/* Active Wizard Overlay */}
-                {activeWizard && (
-                    <WorkflowWizard 
-                        type={activeWizard} 
-                        onClose={() => setActiveWizard(null)} 
-                        onSubmit={handleWizardSubmit}
-                    />
-                )}
-                
+                {loading && <ContextAwareLoading lastUserMessage={activeTab.messages[activeTab.messages.length - 1]?.text} />}
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area - Command Deck Style */}
-            <div className="p-2 sm:p-4 bg-theme-bg/95 backdrop-blur-md border-t border-theme-border relative z-20 pb-safe">
-                <div className="max-w-4xl mx-auto">
-                    {/* Intent Menu */}
-                    {showIntentMenu && selectedTicker && (
-                        <div className="absolute bottom-full left-4 mb-2 bg-theme-surface rounded-xl shadow-2xl border border-theme-border p-2 w-72 animate-slide-up overflow-hidden">
-                            <div className="px-3 py-2 text-[10px] font-bold text-theme-muted uppercase border-b border-theme-border mb-1 flex justify-between items-center bg-theme-bg/50">
-                                <span>Analysis for {selectedTicker.symbol}</span>
-                                <button onClick={() => setShowIntentMenu(false)}><X size={12} /></button>
-                            </div>
-                            <button onClick={() => handleSmartAction(selectedTicker.symbol, 'annual_report')} className="w-full text-left p-2.5 hover:bg-theme-bg rounded flex items-center gap-3 text-xs font-bold text-theme-text transition-colors"><FileText size={14} className="text-blue-500"/> Annual Report Deep Dive</button>
-                            <button onClick={() => handleSmartAction(selectedTicker.symbol, 'concall')} className="w-full text-left p-2.5 hover:bg-theme-bg rounded flex items-center gap-3 text-xs font-bold text-theme-text transition-colors"><Phone size={14} className="text-purple-500"/> Earnings Call Sentiment</button>
-                            <button onClick={() => handleSmartAction(selectedTicker.symbol, 'red_flags')} className="w-full text-left p-2.5 hover:bg-theme-bg rounded flex items-center gap-3 text-xs font-bold text-theme-text transition-colors"><AlertOctagon size={14} className="text-red-500"/> Safety Check (Red Flags)</button>
-                        </div>
-                    )}
+            {/* Floating Wizard Modal */}
+            {activeWizard && (
+                <WorkflowWizard 
+                    type={activeWizard} 
+                    onClose={() => setActiveWizard(null)} 
+                    onSubmit={handleWizardSubmit} 
+                />
+            )}
+
+            {/* Input Area */}
+            <div className="p-4 bg-theme-bg border-t border-theme-border relative z-20">
+                <div className="max-w-4xl mx-auto relative">
                     
-                    {/* Autocomplete */}
+                    {/* Suggestions (Autocomplete) */}
                     {showSuggestions && filteredSuggestions.length > 0 && (
-                        <div className="absolute bottom-full left-4 mb-2 bg-theme-surface rounded-xl shadow-2xl border border-theme-border w-72 overflow-hidden animate-slide-up z-30 ring-1 ring-black/5">
-                            {/* Header */}
-                             <div className="px-3 py-2 bg-theme-bg border-b border-theme-border">
-                                 <div className="flex items-center gap-2">
-                                    {triggerType === '@' && <Building2 size={12} className="text-blue-400"/>}
-                                    {triggerType === '#' && <Globe size={12} className="text-purple-400"/>}
-                                    {triggerType === '/' && <Terminal size={12} className="text-orange-400"/>}
-                                    <span className="text-[10px] font-bold uppercase text-theme-muted">
-                                        {triggerType === '@' ? 'Select Stock' : triggerType === '#' ? 'Select Macro' : 'Commands'}
-                                    </span>
-                                 </div>
-                             </div>
-                             {filteredSuggestions.map(t => (
-                                 <button
-                                    key={t.symbol}
-                                    onClick={() => handleSelectSuggestion(t)}
-                                    className="w-full text-left px-4 py-3 hover:bg-theme-bg/50 border-b border-theme-border last:border-0 flex justify-between items-center group transition-colors"
-                                 >
-                                     <div>
-                                         <span className="block font-bold text-sm text-theme-text group-hover:text-theme-accent">{t.symbol}</span>
-                                         <span className="block text-xs text-theme-muted">{t.name}</span>
-                                     </div>
-                                     <span className="text-[10px] bg-theme-bg text-theme-muted px-1.5 py-0.5 rounded border border-theme-border">{t.type}</span>
-                                 </button>
-                             ))}
+                        <div className="absolute bottom-full left-0 mb-2 bg-theme-surface border border-theme-border rounded-xl shadow-2xl w-72 overflow-hidden animate-slide-up z-50">
+                            <div className="max-h-60 overflow-y-auto">
+                                {filteredSuggestions.map(t => (
+                                    <button 
+                                        key={t.symbol}
+                                        onClick={() => handleSelectSuggestion(t)}
+                                        className="w-full text-left px-4 py-3 hover:bg-theme-bg border-b border-theme-border last:border-0 flex justify-between items-center group/item transition-colors"
+                                    >
+                                        <div>
+                                            <span className="block font-bold text-sm text-theme-text group-hover/item:text-theme-accent">
+                                                {triggerType === '#' ? '#' : triggerType === '/' ? '/' : ''}{t.symbol}
+                                            </span>
+                                            <span className="block text-xs text-theme-muted">{t.name}</span>
+                                        </div>
+                                        <span className="text-[10px] bg-theme-bg text-theme-muted px-1.5 py-0.5 rounded">{t.type}</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     )}
-                    
-                    {/* Contextual Suggestion Pills (Appears after selecting # or @) */}
-                    {(contextualItem && !showSuggestions) && (
+
+                    {/* Contextual Pills */}
+                    {contextualItem && !showSuggestions && (
                         <ContextualSuggestions 
                             triggerType={contextualType || ''} 
                             item={contextualItem} 
-                            onAction={handleContextualAction} 
+                            onAction={handleContextualAction}
                         />
                     )}
 
-                    {/* Input Legend Bar */}
-                    <InputLegend onTrigger={handleTriggerClick} />
+                    {/* Input Legend */}
+                    {!contextualItem && (
+                        <InputLegend onTrigger={handleTriggerClick} />
+                    )}
 
-                    <div className="relative flex items-center gap-2 group pb-1">
-                        <input 
+                    {/* Main Input Field */}
+                    <div className="relative flex items-end gap-2 bg-theme-surface border border-theme-border rounded-2xl p-2 shadow-sm focus-within:ring-2 focus-within:ring-theme-accent/20 focus-within:border-theme-accent/50 transition-all">
+                        <button 
+                            onClick={() => setActiveWizard('macro')}
+                            className="p-2 text-theme-muted hover:text-theme-accent hover:bg-theme-bg rounded-xl transition-colors flex-shrink-0 hidden sm:block" 
+                            title="Open Tools"
+                        >
+                            <Plus size={20} />
+                        </button>
+                        
+                        <input
                             ref={inputRef}
-                            type="text" 
+                            type="text"
                             value={inputValue}
                             onChange={handleInputChange}
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
                                     if (showSuggestions && filteredSuggestions.length > 0) {
                                         handleSelectSuggestion(filteredSuggestions[0]);
-                                        e.preventDefault();
                                     } else {
                                         handleSendMessage(inputValue);
                                     }
                                 }
                             }}
-                            placeholder="Type a command... (Try 'Compare TCS vs Infy')"
-                            className="flex-1 bg-theme-surface border border-theme-border rounded-xl px-3 py-3 sm:px-5 sm:py-4 text-sm focus:outline-none focus:border-theme-accent focus:ring-4 focus:ring-theme-accent/10 transition-all placeholder-theme-muted text-theme-text shadow-sm group-hover:shadow-md"
+                            placeholder="Ask FinGenie... (Try 'Compare TCS vs Infy' or type @ for stocks)"
+                            className="w-full bg-transparent border-none focus:ring-0 text-theme-text placeholder-theme-muted/50 py-2.5 max-h-32 min-h-[44px] resize-none"
                             disabled={loading}
+                            autoComplete="off"
                         />
-                        <button 
+                        
+                        <button
                             onClick={() => handleSendMessage(inputValue)}
                             disabled={!inputValue.trim() || loading}
-                            className="absolute right-2 p-2.5 bg-theme-accent hover:bg-theme-accent/90 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-all shadow-lg shadow-theme-accent/20 hover:shadow-theme-accent/40 active:scale-95"
+                            className="p-2.5 bg-theme-accent hover:bg-theme-accent/90 disabled:bg-theme-surface disabled:text-theme-muted text-white rounded-xl transition-all shadow-md disabled:shadow-none flex-shrink-0"
                         >
                             <Send size={18} />
                         </button>
                     </div>
-                    <div className="text-[10px] text-theme-muted text-center mt-1 opacity-60 hidden sm:block">
-                         FinGenie AI can make mistakes. Verify important financial data.
+                    <div className="text-center mt-2">
+                        <p className="text-[10px] text-theme-muted">FinGenie AI can make mistakes. Verify important financial data.</p>
                     </div>
                 </div>
             </div>
         </div>
 
-        {/* RIGHT PANEL: EVIDENCE / DOCUMENT VIEWER (CONDITIONAL) */}
+        {/* RIGHT PANEL: EVIDENCE / DOC VIEWER */}
         {activeTab.evidence && (
-            <div className="w-full lg:w-1/2 flex flex-col bg-theme-surface border-l border-theme-border animate-slide-left shadow-2xl z-20 absolute inset-0 lg:static">
-                {/* Header */}
-                <div className="h-12 flex items-center justify-between px-6 border-b border-theme-border bg-theme-bg">
-                    <div className="flex items-center gap-2 text-xs font-bold text-theme-text uppercase tracking-wider">
-                        <FileText size={14} className="text-theme-accent" />
-                        Evidence: {activeTab.evidence.title}
+            <div className="hidden lg:flex flex-col w-1/2 bg-theme-surface/50 border-l border-theme-border h-full overflow-hidden relative">
+                <div className="h-12 border-b border-theme-border flex items-center justify-between px-4 bg-theme-surface">
+                    <div className="flex items-center gap-2 font-bold text-theme-text text-sm">
+                        <FileText size={16} className="text-theme-accent"/>
+                        {activeTab.evidence.title}
                     </div>
                     <div className="flex items-center gap-2">
-                         <div className="relative group hidden sm:block">
-                            <Search size={14} className="text-theme-muted absolute left-2.5 top-1/2 -translate-y-1/2 group-focus-within:text-theme-accent transition-colors" />
-                            <input 
-                                type="text" 
-                                placeholder="Search doc..." 
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-theme-bg border border-theme-border rounded-full py-1.5 pl-8 pr-3 text-xs w-32 focus:w-48 transition-all focus:border-theme-accent outline-none text-theme-text placeholder-theme-muted"
-                            />
-                         </div>
-                         <button onClick={() => updateActiveTab({ evidence: null })} className="p-1 hover:bg-theme-bg rounded-full text-theme-muted hover:text-red-500 transition-colors">
-                             <X size={16}/>
-                         </button>
+                        <button className="text-xs bg-theme-bg border border-theme-border px-2 py-1 rounded hover:text-theme-accent transition-colors">Original PDF</button>
+                        <button onClick={() => updateActiveTab({ evidence: null })} className="p-1 hover:bg-theme-bg rounded text-theme-muted">
+                            <X size={16} />
+                        </button>
                     </div>
                 </div>
-
-                {/* Document Content */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar bg-[#fcfcfc] dark:bg-[#0d1117]">
-                    <div className="max-w-3xl mx-auto bg-white dark:bg-[#161b22] shadow-sm p-6 sm:p-10 min-h-full border border-gray-200 dark:border-gray-800 rounded-sm relative selection:bg-yellow-200 dark:selection:bg-yellow-900 selection:text-black dark:selection:text-white">
-                        {/* Bingo Data Visualization (If Earnings Call) */}
-                        {activeTab.evidence.bingoData && (
+                
+                <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-[#0d1117] font-serif leading-relaxed text-gray-800 dark:text-gray-300 relative">
+                    {/* Gamified Overlay for Earnings Calls */}
+                    {activeTab.evidence.type === 'concall' && activeTab.evidence.bingoData && (
+                        <div className="mb-8 sticky top-0 z-10">
                             <EarningsBingo data={activeTab.evidence.bingoData} />
-                        )}
-
-                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8 border-b border-gray-200 dark:border-gray-800 pb-4 leading-tight">{activeTab.evidence.title}</h1>
-                        <div className="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300 leading-relaxed font-serif">
-                             <div className="whitespace-pre-wrap">
-                                 {/* Highlighted text content */}
-                                 {activeTab.evidence.content}
-                             </div>
                         </div>
+                    )}
+
+                    {/* Document Content */}
+                    <div className="prose dark:prose-invert max-w-none text-sm">
+                        <ReactMarkdown>{activeTab.evidence.content}</ReactMarkdown>
                     </div>
                 </div>
             </div>
         )}
-
     </div>
   );
 };

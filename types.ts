@@ -133,18 +133,42 @@ export interface PortfolioHealthReport {
   timestamp: number;
 }
 
+export type TemplateType = 'battle' | 'valuation' | 'forensic' | 'general';
+
 // Structured News/Analysis Insight (The Executive Briefing)
 export interface NewsInsight {
   gist: string;
-  verdict?: 'BUY' | 'SELL' | 'HOLD' | 'SAFE' | 'RISKY' | 'OVERVALUED' | 'UNDERVALUED' | 'NEUTRAL'; // New
+  verdict?: 'BUY' | 'SELL' | 'HOLD' | 'SAFE' | 'RISKY' | 'OVERVALUED' | 'UNDERVALUED' | 'NEUTRAL' | 'WINNER' | 'MIXED';
+  template?: TemplateType; // Polymorphic Template ID
+  confidenceScore?: number; // 0-100
   stats: Array<{ label: string; value: string }>;
   outlook: string;
   hypeScore: number; // 0-100
-  pros?: string[]; // New: The Good
-  cons?: string[]; // New: The Bad / Risks
+  pros?: string[]; // The Good
+  cons?: string[]; // The Bad / Risks
   impact: {
     beneficiaries: string[];
     negativelyImpacted: string[];
+  };
+  
+  // Template Specific Data
+  battle?: {
+      winner: string;
+      loser: string;
+      metrics: Array<{ label: string; winnerValue: string; loserValue: string; winnerFavored: boolean }>;
+  };
+  valuation?: {
+      currentPrice: string;
+      fairValue: string;
+      upside: string; // e.g. "+15%"
+      status: 'Overvalued' | 'Undervalued' | 'Fair';
+      justification: string[];
+  };
+  forensic?: {
+      score: number; // 0-100 (100 is Safe)
+      status: 'Clean' | 'Concern' | 'Critical';
+      redFlags: Array<{ title: string; severity: 'High' | 'Medium'; desc: string }>;
+      auditorNote?: string;
   };
 }
 
@@ -157,15 +181,16 @@ export interface ChatMessage {
   id: string;
   role: Role;
   text: string;
-  thoughts?: string; // New: Internal monologue/reasoning steps
+  thoughts?: string; // Internal monologue/reasoning steps
   sentimentScore?: number; // -100 (Bearish) to 100 (Bullish)
   suggestions?: string[]; // Dynamic follow-up questions
-  sources?: SourceLink[]; // New: Citations
-  followUp?: string[]; // New: Specific follow up questions
+  sources?: SourceLink[]; // Citations
+  followUp?: string[]; // Specific follow up questions
   chartData?: ChartData; // Optional JSON for dynamic charts (Recharts)
   dominoData?: DominoData; // Optional JSON for Supply Chain Graph
   portfolioReport?: PortfolioHealthReport; // Optional JSON for Portfolio Dashboard
   insightData?: NewsInsight; // Optional JSON for Structured Summary
+  forensicData?: ForensicAnalysisResult; // Optional legacy forensic data
   timestamp: number;
   isLoading?: boolean;
   liked?: boolean; // For user feedback
