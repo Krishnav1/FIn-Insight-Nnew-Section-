@@ -86,6 +86,51 @@ const extractJsonBlock = (text: string, tag: string): { json: any, fullMatch: st
 };
 
 /**
+ * Fallback extractor that searches for a JSON object containing specific keys 
+ * (like "template") when the explicit tag is missing.
+ */
+const extractLooseInsightData = (text: string): { json: any, fullMatch: string } | null => {
+    let i = 0;
+    while (i < text.length) {
+        if (text[i] === '{') {
+             let brace = 0;
+             let inStr = false;
+             let esc = false;
+             // Scan forward to find the matching closing brace
+             for (let j = i; j < text.length; j++) {
+                 const c = text[j];
+                 if (esc) { esc = false; continue; }
+                 if (c === '\\') { esc = true; continue; }
+                 if (c === '"') { inStr = !inStr; continue; }
+                 if (!inStr) {
+                     if (c === '{') brace++;
+                     else if (c === '}') {
+                         brace--;
+                         if (brace === 0) {
+                             const block = text.substring(i, j + 1);
+                             // Heuristic: check for keys specific to our Insight schema to confirm it's the right JSON
+                             if (block.includes('"template"') && (block.includes('"gist"') || block.includes('"battle"') || block.includes('"verdict"'))) {
+                                 try {
+                                     const json = JSON.parse(cleanJsonString(block));
+                                     return { json, fullMatch: block };
+                                 } catch(e) {
+                                     // JSON parse failed, continue searching
+                                 }
+                             }
+                             // If this block wasn't the one, advance i to j to skip it
+                             i = j;
+                             break;
+                         }
+                     }
+                 }
+             }
+        }
+        i++;
+    }
+    return null;
+}
+
+/**
  * Helper to parse AI response text and extract structured data tags.
  */
 const parseAIResponse = (rawText: string) => {
@@ -125,43 +170,55 @@ const parseAIResponse = (rawText: string) => {
       dominoData = dominoExtraction.json;
   }
 
+  // Improved Insight Extraction with Fallback
   let insightData: NewsInsight | undefined = undefined;
   const insightExtraction = extractJsonBlock(text, '[INSIGHT_DATA:');
+  
   if (insightExtraction) {
       insightData = insightExtraction.json;
-      // Strict Type Sanitization to prevent UI crashes
-      if (insightData) {
-          if (!Array.isArray(insightData.pros)) {
-              // If string, wrap in array. If undefined, empty array.
-              insightData.pros = typeof insightData.pros === 'string' ? [insightData.pros] : [];
-          }
-          if (!Array.isArray(insightData.cons)) {
-              insightData.cons = typeof insightData.cons === 'string' ? [insightData.cons] : [];
-          }
-          if (!Array.isArray(insightData.stats)) {
-              insightData.stats = [];
-          }
-          if (!insightData.impact) {
-              insightData.impact = { beneficiaries: [], negativelyImpacted: [] };
-          }
-          
-          // Sanitization for Polymorphic Templates
-          if (insightData.battle && !Array.isArray(insightData.battle.metrics)) {
-              insightData.battle.metrics = [];
-          }
-          if (insightData.valuation && !Array.isArray(insightData.valuation.justification)) {
-              insightData.valuation.justification = typeof insightData.valuation.justification === 'string' 
-                ? [insightData.valuation.justification] 
-                : [];
-          }
-          if (insightData.forensic && !Array.isArray(insightData.forensic.redFlags)) {
-              insightData.forensic.redFlags = [];
-          }
+      // Remove the tagged block
+      text = text.replace(insightExtraction.fullMatch, '');
+  } else {
+      // Fallback: Check for heuristic JSON if tag is missing
+      const loose = extractLooseInsightData(text);
+      if (loose) {
+          insightData = loose.json;
+          // Remove the raw JSON from text so it doesn't display as duplicate content
+          text = text.replace(loose.fullMatch, '').trim();
+      }
+  }
 
-          // Ensure template defaults to general if missing
-          if (!insightData.template) {
-              insightData.template = 'general';
-          }
+  // Strict Type Sanitization to prevent UI crashes
+  if (insightData) {
+      if (!Array.isArray(insightData.pros)) {
+          insightData.pros = typeof insightData.pros === 'string' ? [insightData.pros] : [];
+      }
+      if (!Array.isArray(insightData.cons)) {
+          insightData.cons = typeof insightData.cons === 'string' ? [insightData.cons] : [];
+      }
+      if (!Array.isArray(insightData.stats)) {
+          insightData.stats = [];
+      }
+      if (!insightData.impact) {
+          insightData.impact = { beneficiaries: [], negativelyImpacted: [] };
+      }
+      
+      // Sanitization for Polymorphic Templates
+      if (insightData.battle && !Array.isArray(insightData.battle.metrics)) {
+          insightData.battle.metrics = [];
+      }
+      if (insightData.valuation && !Array.isArray(insightData.valuation.justification)) {
+          insightData.valuation.justification = typeof insightData.valuation.justification === 'string' 
+            ? [insightData.valuation.justification] 
+            : [];
+      }
+      if (insightData.forensic && !Array.isArray(insightData.forensic.redFlags)) {
+          insightData.forensic.redFlags = [];
+      }
+
+      // Ensure template defaults to general if missing
+      if (!insightData.template) {
+          insightData.template = 'general';
       }
   }
   
@@ -169,6 +226,7 @@ const parseAIResponse = (rawText: string) => {
   const forensicExtraction = extractJsonBlock(text, '[FORENSIC_DATA:');
   if (forensicExtraction) {
       forensicData = forensicExtraction.json;
+      text = text.replace(forensicExtraction.fullMatch, '');
   }
 
   let sources: SourceLink[] | undefined = undefined;
@@ -189,6 +247,8 @@ const parseAIResponse = (rawText: string) => {
               return true;
           } catch { return false; }
       }).slice(0, 4);
+      
+      text = text.replace(sourcesExtraction.fullMatch, '');
   }
 
   let followUp: string[] | undefined = undefined;
@@ -200,12 +260,14 @@ const parseAIResponse = (rawText: string) => {
       } else {
           followUp = [];
       }
+      text = text.replace(followUpExtraction.fullMatch, '');
   }
   
+  // Cleanup leftover tags
   const tagsToRemove = [
       /\[CHART_DATA:[\s\S]*?\]/g,
       /\[DOMINO_DATA:[\s\S]*?\]/g,
-      /\[INSIGHT_DATA:[\s\S]*?\]/g,
+      /\[INSIGHT_DATA:[\s\S]*?\]/g, // Just in case regex matches leftovers
       /\[SOURCES:[\s\S]*?\]/g,
       /\[FOLLOW_UP:[\s\S]*?\]/g,
       /\[BINGO_DATA:[\s\S]*?\]/g,
@@ -238,60 +300,51 @@ export const startChatSession = (contextArticle: Article | null, portfolio: Port
     const systemInstruction = `You are FinGenie, an elite AI Financial Analyst for retail investors.
     
     CORE PROTOCOL:
-    1. DETECT INTENT: Classify the user's request into one of 4 templates:
+    1. DETECT INTENT: Classify the user's request into one of 5 templates:
        - 'battle' (Comparison of two or more assets)
        - 'valuation' (Is it overvalued? Fair price? Buy now?)
-       - 'forensic' (Safety check, risk analysis, red flags)
+       - 'forensic' (Safety check, risk analysis, red flags, or CEO Lie Detector)
+       - 'domino' (Supply chain, macro impact, ripple effects)
        - 'general' (News, Summary, Impact, or anything else)
     
-    2. FIRST PRINCIPLES: Extract raw data first. If you cannot find specific numbers (e.g. Debt/Equity, P/E), explicitly state "Data Unavailable". Do not hallucinate numbers.
+    2. FIRST PRINCIPLES: Extract raw data first. If you cannot find specific numbers, state "Data Unavailable".
     
-    3. OUTPUT FORMAT:
-       - Generate a valid JSON object for [INSIGHT_DATA] matching the detected template.
-       - Follow with a concise textual explanation (Executive Briefing style).
-       - Always include [SOURCES] and [FOLLOW_UP].
+    3. SPECIALIZED TOOLS:
+       - If user asks about "Supply Chain", "Domino Effect", or "Network", generate [DOMINO_DATA].
+       - If user asks about "Lie Detector", "Tone", or "Management Credibility", use the 'forensic' template in [INSIGHT_DATA] with a focus on linguistic cues.
 
-    RESPONSE JSON STRUCTURE ([INSIGHT_DATA]):
-    {
+    RESPONSE JSON STRUCTURES:
+    
+    A. [INSIGHT_DATA: {
       "template": "battle" | "valuation" | "forensic" | "general",
-      "gist": "1-sentence executive summary of the verdict.",
+      "gist": "1-sentence executive summary.",
       "verdict": "BUY" | "SELL" | "HOLD" | "SAFE" | "RISKY" | "OVERVALUED" | "UNDERVALUED" | "WINNER",
-      "confidenceScore": 0-100, // How confident are you in the data availability?
-      "stats": [{"label": "Key Metric", "value": "Value"}], // For general template
+      "confidenceScore": 0-100,
       
-      // IF TEMPLATE = 'battle'
-      "battle": { 
-          "winner": "TCS", 
-          "loser": "Infosys", 
-          "metrics": [
-              {"label": "Revenue Growth", "winnerValue": "12%", "loserValue": "8%", "winnerFavored": true},
-              {"label": "P/E Ratio", "winnerValue": "28x", "loserValue": "24x", "winnerFavored": false}
-          ] 
-      },
-
-      // IF TEMPLATE = 'valuation'
-      "valuation": { 
-          "currentPrice": "1200", 
-          "fairValue": "1450", 
-          "upside": "+20%", 
-          "status": "Undervalued", 
-          "justification": ["Trading below 5yr avg P/E", "Strong FCF yield"] 
-      },
-
-      // IF TEMPLATE = 'forensic'
+      // IF TEMPLATE = 'forensic' (Used for Lie Detector too)
       "forensic": { 
-          "score": 85, // 0-100 (100 = Safe)
-          "status": "Clean", 
-          "redFlags": [{"title": "High Debt", "severity": "Medium", "desc": "D/E ratio > 2.0"}], 
-          "auditorNote": "Big 4 Auditor (Deloitte)" 
+          "score": 85, // 0-100 (100 = Honest/Safe)
+          "status": "Clean" | "Questionable" | "Deceptive", 
+          "redFlags": [{"title": "Evasive Answer", "severity": "High", "desc": "Dodged question on margins."}], 
+          "auditorNote": "Tone Analysis / Auditor Name" 
       },
+      // ... (other template fields: battle, valuation, etc.)
+    }]
 
-      // COMMON FIELDS
-      "pros": ["Strong moat", "High margins"], 
-      "cons": ["Regulatory risk"], 
-      "hypeScore": 50, 
-      "impact": { "beneficiaries": [], "negativelyImpacted": [] }
-    }
+    B. [DOMINO_DATA: {
+       "nodes": [
+          {"id": "1", "name": "Tata Motors", "type": "target", "sentiment": "neutral", "impactDetails": "Central Entity"},
+          {"id": "2", "name": "Tata Steel", "type": "supplier", "sentiment": "negative", "impactDetails": "Rising input costs"},
+          {"id": "3", "name": "UK Market", "type": "customer", "sentiment": "positive", "impactDetails": "Strong JLR demand"}
+       ],
+       "edges": [
+          {"source": "2", "target": "1", "label": "Raw Materials", "impact": "negative"},
+          {"source": "1", "target": "3", "label": "Sales", "impact": "positive"}
+       ]
+    }]
+    
+    Executive Briefing:
+    (Your analysis here...)
     
     [SOURCES: [{ "title": "...", "url": "..." }]]
     [FOLLOW_UP: ["Q1?", "Q2?", "Q3?"]]
@@ -335,21 +388,52 @@ export const getInitialPrompt = (type: string): string => {
 
 export const fetchLiveNews = async (): Promise<Article[]> => {
     // In a real app, this would call an external News API.
-    // For now, we return the mock data but simulated as an async fetch.
     return new Promise(resolve => setTimeout(() => resolve(MOCK_ARTICLES), 800));
 };
 
 export const analyzeDocument = async (ticker: string, docType: DocumentType): Promise<any> => {
-    const prompt = `Analyze the ${docType} for ${ticker}. 
-    Provide a deep dive analysis.
+    let prompt = "";
     
-    REQUIRED JSON OUTPUTS:
-    1. [INSIGHT_DATA] with the summary and template type (usually 'forensic' for red_flags or 'general' for others).
-    2. [CHART_DATA] if there are financial trends.
-    3. [SOURCES] and [FOLLOW_UP].
-    
-    If docType is 'red_flags' or 'ceo_lie_detector', use template='forensic'.
-    `;
+    if (docType === 'supply_chain') {
+        prompt = `Generate a Supply Chain "Domino Effect" graph for ${ticker}.
+        Identify key suppliers (upstream) and customers/markets (downstream).
+        Analyze current macro risks for each node.
+        
+        REQUIRED OUTPUT:
+        1. [DOMINO_DATA]: A JSON object with 'nodes' and 'edges'.
+           Nodes must include: id, name, type ('supplier'|'target'|'customer'), sentiment ('positive'|'negative'|'neutral'), and impactDetails (short string).
+        2. [INSIGHT_DATA]: A brief summary of the supply chain resilience with template='general'.
+        3. Textual explanation.
+        `;
+    } else if (docType === 'ceo_lie_detector') {
+        prompt = `Act as a Forensic Linguist. Analyze the latest Earnings Call or management commentary for ${ticker}.
+        Detect evasion, "non-answers", over-optimism, and contradictions between tone and financials.
+        
+        REQUIRED OUTPUT:
+        1. [INSIGHT_DATA]: Use template="forensic".
+           - "score": 0-100 (100 = Honest/Transparent, 0 = Deceptive/Evasive).
+           - "status": "Reliable" | "Questionable" | "Deceptive".
+           - "redFlags": List specific quotes or topics where management was evasive or contradictory. Title should be the type of evasion (e.g. "Deflection").
+           - "auditorNote": "Linguistic Tone Analysis".
+           - "gist": Summary of the management's credibility and sentiment.
+        2. [BINGO_DATA]: {
+            "wordCloud": [{"word": "Headwinds", "count": 12, "sentiment": "negative"}, ...],
+            "sentimentTimeline": [{"time": "Intro", "sentiment": 80}, {"time": "Q&A", "sentiment": -20, "annotation": "Defensive on margins"}]
+           }
+        3. Textual analysis.
+        `;
+    } else {
+        prompt = `Analyze the ${docType} for ${ticker}. 
+        Provide a deep dive analysis.
+        
+        REQUIRED JSON OUTPUTS:
+        1. [INSIGHT_DATA] with the summary and template type (usually 'forensic' for red_flags or 'general' for others).
+        2. [CHART_DATA] if there are financial trends.
+        3. [SOURCES] and [FOLLOW_UP].
+        
+        If docType is 'red_flags', use template='forensic'.
+        `;
+    }
 
     try {
         const response = await ai.models.generateContent({

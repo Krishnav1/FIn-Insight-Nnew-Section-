@@ -73,6 +73,8 @@ const ContextAwareLoading = ({ lastUserMessage }: { lastUserMessage?: string }) 
             newSteps = ["Retrieving P/E and PEG Ratios...", "Comparing with Industry Peers...", "Projecting Future Growth...", "Calculating Fair Value..."];
         } else if (msg.includes("ceo") || msg.includes("lie") || msg.includes("management")) {
             newSteps = ["Parsing Earnings Call Transcript...", "Analyzing Tone vs. Financials...", "Detecting Evasiveness...", "Fact-checking Optimism..."];
+        } else if (msg.includes("supply") || msg.includes("chain") || msg.includes("domino")) {
+            newSteps = ["Mapping upstream suppliers...", "Identifying key customers...", "Scanning macro risks...", "Building Knowledge Graph..."];
         } else {
             newSteps = ["Reading market data...", "Checking financial health...", "Synthesizing insights..."];
         }
@@ -256,7 +258,7 @@ const ForensicCard = ({ data }: { data: NewsInsight['forensic'] }) => {
                     <Search size={18} className="text-purple-500" />
                     <h4 className="text-sm font-bold text-theme-text uppercase tracking-wide">Forensic Scan</h4>
                 </div>
-                <div className="text-xs text-theme-muted font-mono">Auditor: {data.auditorNote || 'Unknown'}</div>
+                <div className="text-xs text-theme-muted font-mono">{data.auditorNote || 'Automated Analysis'}</div>
             </div>
 
             <div className="p-5">
@@ -265,7 +267,7 @@ const ForensicCard = ({ data }: { data: NewsInsight['forensic'] }) => {
                         <Icon size={32} className={color} />
                     </div>
                     <div>
-                        <div className="text-xs text-theme-muted uppercase font-bold">Safety Score</div>
+                        <div className="text-xs text-theme-muted uppercase font-bold">Credibility Score</div>
                         <div className={`text-3xl font-black ${color}`}>{data.score}/100</div>
                         <div className={`text-xs font-bold ${color}`}>{data.status.toUpperCase()}</div>
                     </div>
@@ -536,7 +538,7 @@ const EarningsBingo = ({ data }: { data: BingoData }) => {
 
 // --- NEW WORKFLOW WIZARD ---
 
-type WizardType = 'compare' | 'risk' | 'valuation' | 'macro' | 'lie_detector';
+type WizardType = 'compare' | 'risk' | 'valuation' | 'macro' | 'lie_detector' | 'supply_chain';
 
 interface WorkflowWizardProps {
     type: WizardType;
@@ -600,6 +602,15 @@ const WorkflowWizard: React.FC<WorkflowWizardProps> = ({ type, onClose, onSubmit
                     { key: "context", label: "Recent context?", placeholder: "e.g. Latest earnings call, recent scandal" }
                 ],
                 promptTemplate: (i: any) => `Perform a 'CEO Lie Detector' test on ${i.stock} regarding ${i.context}. Compare management's optimistic tone in recent calls against the cold hard numbers in the financial statements. Highlight any contradictions or evasive answers.`
+            };
+            case 'supply_chain': return {
+                title: "The Domino Effect",
+                icon: Factory,
+                color: "text-orange-600",
+                steps: [
+                    { key: "stock", label: "Target Company", placeholder: "Enter symbol (e.g. Tata Motors)" }
+                ],
+                promptTemplate: (i: any) => `Generate a supply chain knowledge graph for ${i.stock}. Identify top 5 suppliers and customers. Analyze macro risks affecting this network.`
             };
             default: return null;
         }
@@ -668,14 +679,15 @@ const WorkflowWizard: React.FC<WorkflowWizardProps> = ({ type, onClose, onSubmit
 const WorkflowSelector = ({ onSelect }: { onSelect: (type: WizardType) => void }) => {
     const workflows = [
         { id: 'compare', title: "Compare Stocks", desc: "Compare A vs B", example: "Compare TCS vs Infy for growth", icon: Scale, color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-900/10", border: "border-orange-100 dark:border-orange-900/30", hover: "hover:border-orange-500 dark:hover:border-orange-500" },
+        { id: 'supply_chain', title: "Domino Effect", desc: "Map supply chain risks", example: "Map supply chain for Tata Motors", icon: Factory, color: "text-orange-600", bg: "bg-orange-50 dark:bg-orange-900/10", border: "border-orange-100 dark:border-orange-900/30", hover: "hover:border-orange-600 dark:hover:border-orange-600" },
         { id: 'risk', title: "Safe or Risky?", desc: "Check for red flags", example: "Analyze Adani Ent debt risks", icon: Shield, color: "text-red-500", bg: "bg-red-50 dark:bg-red-900/10", border: "border-red-100 dark:border-red-900/30", hover: "hover:border-red-500 dark:hover:border-red-500" },
         { id: 'valuation', title: "Is it Overvalued?", desc: "Check price fairness", example: "Is Reliance overvalued now?", icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/10", border: "border-emerald-100 dark:border-emerald-900/30", hover: "hover:border-emerald-500 dark:hover:border-emerald-500" },
-        { id: 'macro', title: "What If...?", desc: "Simulate events", example: "Impact of oil at $100 on Paints", icon: Activity, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/10", border: "border-blue-100 dark:border-blue-900/30", hover: "hover:border-blue-500 dark:hover:border-blue-500" },
         { id: 'lie_detector', title: "CEO Lie Detector", desc: "Tone vs Reality", example: "Did the CEO avoid questions?", icon: AlertOctagon, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-900/10", border: "border-purple-100 dark:border-purple-900/30", hover: "hover:border-purple-500 dark:hover:border-purple-500" },
+        { id: 'macro', title: "What If...?", desc: "Simulate events", example: "Impact of oil at $100 on Paints", icon: Activity, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/10", border: "border-blue-100 dark:border-blue-900/30", hover: "hover:border-blue-500 dark:hover:border-blue-500" },
     ];
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-8 max-w-3xl mx-auto px-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-8 max-w-4xl mx-auto px-4">
             {workflows.map((w) => (
                 <button 
                     key={w.id}
@@ -998,6 +1010,8 @@ const FinGeniePage: React.FC<FinGeniePageProps> = ({ botAvatarUrl }) => {
       setInputValue(prompt);
       setActiveWizard(null);
       inputRef.current?.focus();
+      // Optionally auto-send
+      handleSendMessage(prompt);
   };
 
   const handleSmartAction = async (ticker: string, docType: DocumentType) => {
