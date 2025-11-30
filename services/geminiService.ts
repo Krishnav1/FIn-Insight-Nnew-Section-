@@ -14,9 +14,44 @@ let currentChatSession: Chat | null = null;
 const cleanJsonString = (str: string): string => {
     let cleaned = str.trim();
     cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/, '');
+    cleaned = cleaned.replace(/\[object Object\]/g, ''); // Remove specific hallucination
     // Remove trailing commas before closing braces/brackets
     cleaned = cleaned.replace(/,(\s*[}\]])/g, '$1');
     return cleaned;
+};
+
+/**
+ * Helper to identify the boundaries of a JSON block (start and end index).
+ * Handles nested braces/brackets correctly.
+ */
+const findBlockBoundaries = (text: string, startFromIndex: number, openChar: string, closeChar: string): { start: number, end: number } | null => {
+    let braceCount = 0;
+    let inString = false;
+    let escape = false;
+    let endIndex = -1;
+
+    for (let i = startFromIndex; i < text.length; i++) {
+        const char = text[i];
+        if (escape) { escape = false; continue; }
+        if (char === '\\') { escape = true; continue; }
+        if (char === '"') { inString = !inString; continue; }
+        
+        if (!inString) {
+            if (char === openChar) braceCount++;
+            else if (char === closeChar) {
+                braceCount--;
+                if (braceCount === 0) {
+                    endIndex = i + 1;
+                    break;
+                }
+            }
+        }
+    }
+    
+    if (endIndex !== -1) {
+        return { start: startFromIndex, end: endIndex };
+    }
+    return null;
 };
 
 /**
@@ -41,44 +76,36 @@ const extractJsonBlock = (text: string, tag: string): { json: any, fullMatch: st
             initialChar = '[';
             break;
         }
+        // Safety: If we hit a new line or another tag before JSON, abort
+        if (text[i] === '\n' || (text[i] === '[' && text[i+1] && /[A-Z]/.test(text[i+1]))) {
+           // allow skipping whitespace but be careful
+        }
     }
 
     if (jsonStartIndex === -1) return null;
 
-    let braceCount = 0;
-    let jsonEndIndex = -1;
-    const openChar = initialChar;
-    const closeChar = initialChar === '{' ? '}' : ']';
-    let inString = false;
-    let escape = false;
+    const boundaries = findBlockBoundaries(text, jsonStartIndex, initialChar, initialChar === '{' ? '}' : ']');
     
-    for (let i = jsonStartIndex; i < text.length; i++) {
-        const char = text[i];
-        if (escape) { escape = false; continue; }
-        if (char === '\\') { escape = true; continue; }
-        if (char === '"') { inString = !inString; continue; }
-        
-        if (!inString) {
-            if (char === openChar) braceCount++;
-            else if (char === closeChar) {
-                braceCount--;
-                if (braceCount === 0) {
-                    jsonEndIndex = i + 1;
-                    break;
-                }
+    if (boundaries) {
+        // Try to include the closing bracket of the tag if it exists immediately after
+        let blockEnd = boundaries.end;
+        const potentialTagClose = text.indexOf(']', blockEnd);
+        if (potentialTagClose !== -1 && potentialTagClose < blockEnd + 10) {
+            // Check if it's just whitespace between JSON end and tag close
+            const gap = text.substring(blockEnd, potentialTagClose);
+            if (!gap.trim()) {
+                blockEnd = potentialTagClose + 1;
             }
         }
-    }
 
-    if (jsonEndIndex !== -1) {
-        const fullMatch = text.substring(startTagIndex, text.indexOf(']', jsonEndIndex) + 1 || jsonEndIndex);
-        const jsonStrRaw = text.substring(jsonStartIndex, jsonEndIndex);
+        const fullMatch = text.substring(startTagIndex, blockEnd);
+        const jsonStrRaw = text.substring(boundaries.start, boundaries.end);
 
         try {
             const cleanedJson = cleanJsonString(jsonStrRaw);
             return { json: JSON.parse(cleanedJson), fullMatch };
         } catch (e) {
-            console.warn("Failed to parse JSON block:", e);
+            console.warn(`Failed to parse JSON block for ${tag}:`, e);
             return null;
         }
     }
@@ -86,43 +113,63 @@ const extractJsonBlock = (text: string, tag: string): { json: any, fullMatch: st
 };
 
 /**
- * Fallback extractor that searches for a JSON object containing specific keys 
- * (like "template") when the explicit tag is missing.
+ * Removes a block defined by a tag from the text, even if it couldn't be parsed as JSON.
+ * This ensures raw garbage doesn't leak into the UI.
+ */
+const removeBlock = (text: string, tag: string): string => {
+    const startTagIndex = text.indexOf(tag);
+    if (startTagIndex === -1) return text;
+
+    let jsonStartIndex = -1;
+    let initialChar = '';
+    
+    // Attempt to find JSON start
+    for(let i = startTagIndex + tag.length; i < text.length; i++) {
+        if (text[i] === '{') { jsonStartIndex = i; initialChar = '{'; break; }
+        if (text[i] === '[') { jsonStartIndex = i; initialChar = '['; break; }
+    }
+
+    if (jsonStartIndex === -1) {
+        // If no JSON found, just remove the tag line/segment
+        return text.replace(tag, '');
+    }
+
+    const boundaries = findBlockBoundaries(text, jsonStartIndex, initialChar, initialChar === '{' ? '}' : ']');
+    
+    if (boundaries) {
+        let blockEnd = boundaries.end;
+        const potentialTagClose = text.indexOf(']', blockEnd);
+        if (potentialTagClose !== -1 && potentialTagClose < blockEnd + 10) {
+             blockEnd = potentialTagClose + 1;
+        }
+        
+        const before = text.substring(0, startTagIndex);
+        const after = text.substring(blockEnd);
+        return (before + after).trim();
+    }
+    
+    // Fallback: if boundaries retrieval failed (unbalanced), try a simple removal of tag line
+    return text.replace(tag, '');
+};
+
+/**
+ * Fallback extractor for Insight Data when tag is missing
  */
 const extractLooseInsightData = (text: string): { json: any, fullMatch: string } | null => {
     let i = 0;
     while (i < text.length) {
         if (text[i] === '{') {
-             let brace = 0;
-             let inStr = false;
-             let esc = false;
-             // Scan forward to find the matching closing brace
-             for (let j = i; j < text.length; j++) {
-                 const c = text[j];
-                 if (esc) { esc = false; continue; }
-                 if (c === '\\') { esc = true; continue; }
-                 if (c === '"') { inStr = !inStr; continue; }
-                 if (!inStr) {
-                     if (c === '{') brace++;
-                     else if (c === '}') {
-                         brace--;
-                         if (brace === 0) {
-                             const block = text.substring(i, j + 1);
-                             // Heuristic: check for keys specific to our Insight schema to confirm it's the right JSON
-                             if (block.includes('"template"') && (block.includes('"gist"') || block.includes('"battle"') || block.includes('"verdict"'))) {
-                                 try {
-                                     const json = JSON.parse(cleanJsonString(block));
-                                     return { json, fullMatch: block };
-                                 } catch(e) {
-                                     // JSON parse failed, continue searching
-                                 }
-                             }
-                             // If this block wasn't the one, advance i to j to skip it
-                             i = j;
-                             break;
-                         }
-                     }
+             const boundaries = findBlockBoundaries(text, i, '{', '}');
+             if (boundaries) {
+                 const block = text.substring(boundaries.start, boundaries.end);
+                 if (block.includes('"template"') && (block.includes('"gist"') || block.includes('"battle"') || block.includes('"verdict"'))) {
+                     try {
+                         const json = JSON.parse(cleanJsonString(block));
+                         return { json, fullMatch: block };
+                     } catch(e) {}
                  }
+                 i = boundaries.end; // Skip this block
+                 continue;
              }
         }
         i++;
@@ -136,8 +183,10 @@ const extractLooseInsightData = (text: string): { json: any, fullMatch: string }
 const parseAIResponse = (rawText: string) => {
   let text = rawText || "";
   
+  // 1. Global Cleanup of Hallucinations
   text = text.replace(/\[object Object\]/g, "");
 
+  // 2. Extract Internal Thoughts (Non-JSON)
   let thoughts: string | undefined = undefined;
   const thoughtsMatch = text.match(/\[THOUGHTS\]([\s\S]*?)\[\/THOUGHTS\]/);
   if (thoughtsMatch) {
@@ -145,6 +194,7 @@ const parseAIResponse = (rawText: string) => {
       text = text.replace(thoughtsMatch[0], '').trim();
   }
 
+  // 3. Extract Sentiment (Simple Tag)
   let sentiment: number | undefined = undefined;
   const sentimentMatch = text.match(/\[SENTIMENT:\s*(-?\d+)\]/);
   if (sentimentMatch) {
@@ -152,94 +202,31 @@ const parseAIResponse = (rawText: string) => {
     text = text.replace(/\[SENTIMENT:\s*(-?\d+)\]/, '').trim();
   }
 
-  let chartData: any = undefined;
-  const chartExtraction = extractJsonBlock(text, '[CHART_DATA:');
-  if (chartExtraction) {
-      chartData = chartExtraction.json;
-  }
+  // 4. Extract Structured JSON Blocks
+  // Helper to extract valid JSON and then remove the block from text.
+  // If JSON parse fails, we STILL attempt to remove the block later to avoid ugly text.
+  const extractAndStrip = (tag: string) => {
+      const result = extractJsonBlock(text, tag);
+      if (result) {
+          text = text.replace(result.fullMatch, '');
+          return result.json;
+      }
+      return undefined;
+  };
 
-  let bingoData: BingoData | undefined = undefined;
-  const bingoExtraction = extractJsonBlock(text, '[BINGO_DATA:');
-  if (bingoExtraction) {
-      bingoData = bingoExtraction.json;
-  }
-
-  let dominoData: DominoData | undefined = undefined;
-  const dominoExtraction = extractJsonBlock(text, '[DOMINO_DATA:');
-  if (dominoExtraction) {
-      dominoData = dominoExtraction.json;
-  }
-
-  // Improved Insight Extraction with Fallback
-  let insightData: NewsInsight | undefined = undefined;
-  const insightExtraction = extractJsonBlock(text, '[INSIGHT_DATA:');
+  const chartData = extractAndStrip('[CHART_DATA:');
+  const bingoData = extractAndStrip('[BINGO_DATA:');
+  const dominoData = extractAndStrip('[DOMINO_DATA:');
+  const forensicData = extractAndStrip('[FORENSIC_DATA:');
   
-  if (insightExtraction) {
-      insightData = insightExtraction.json;
-      // Remove the tagged block
-      text = text.replace(insightExtraction.fullMatch, '');
-  } else {
-      // Fallback: Check for heuristic JSON if tag is missing
-      const loose = extractLooseInsightData(text);
-      if (loose) {
-          insightData = loose.json;
-          // Remove the raw JSON from text so it doesn't display as duplicate content
-          text = text.replace(loose.fullMatch, '').trim();
-      }
-  }
-
-  // Strict Type Sanitization to prevent UI crashes
-  if (insightData) {
-      if (!Array.isArray(insightData.pros)) {
-          insightData.pros = typeof insightData.pros === 'string' ? [insightData.pros] : [];
-      }
-      if (!Array.isArray(insightData.cons)) {
-          insightData.cons = typeof insightData.cons === 'string' ? [insightData.cons] : [];
-      }
-      if (!Array.isArray(insightData.stats)) {
-          insightData.stats = [];
-      }
-      if (!insightData.impact) {
-          insightData.impact = { beneficiaries: [], negativelyImpacted: [] };
-      }
-      
-      // Sanitization for Polymorphic Templates
-      if (insightData.battle && !Array.isArray(insightData.battle.metrics)) {
-          insightData.battle.metrics = [];
-      }
-      if (insightData.valuation && !Array.isArray(insightData.valuation.justification)) {
-          insightData.valuation.justification = typeof insightData.valuation.justification === 'string' 
-            ? [insightData.valuation.justification] 
-            : [];
-      }
-      if (insightData.forensic && !Array.isArray(insightData.forensic.redFlags)) {
-          insightData.forensic.redFlags = [];
-      }
-
-      // Ensure template defaults to general if missing
-      if (!insightData.template) {
-          insightData.template = 'general';
-      }
-  }
-  
-  let forensicData: ForensicAnalysisResult | undefined = undefined;
-  const forensicExtraction = extractJsonBlock(text, '[FORENSIC_DATA:');
-  if (forensicExtraction) {
-      forensicData = forensicExtraction.json;
-      text = text.replace(forensicExtraction.fullMatch, '');
-  }
-
+  // Sources & FollowUp
   let sources: SourceLink[] | undefined = undefined;
-  const sourcesExtraction = extractJsonBlock(text, '[SOURCES:');
-  if (sourcesExtraction) {
-      let allSources = sourcesExtraction.json;
-      // Ensure array
-      if (!Array.isArray(allSources)) {
-          allSources = allSources ? [allSources] : [];
-      }
-      // Filter unique domains and limit to 4
+  const sourcesRaw = extractAndStrip('[SOURCES:');
+  if (sourcesRaw) {
+      const arr = Array.isArray(sourcesRaw) ? sourcesRaw : [sourcesRaw];
       const seen = new Set();
-      sources = (allSources as SourceLink[]).filter(s => {
+      sources = arr.filter((s: any) => {
+          if (!s.url) return false;
           try {
               const host = new URL(s.url).hostname;
               if (seen.has(host)) return false;
@@ -247,39 +234,44 @@ const parseAIResponse = (rawText: string) => {
               return true;
           } catch { return false; }
       }).slice(0, 4);
-      
-      text = text.replace(sourcesExtraction.fullMatch, '');
   }
 
   let followUp: string[] | undefined = undefined;
-  const followUpExtraction = extractJsonBlock(text, '[FOLLOW_UP:');
-  if (followUpExtraction) {
-      let followUpRaw = followUpExtraction.json;
-      if (Array.isArray(followUpRaw)) {
-          followUp = followUpRaw;
-      } else {
-          followUp = [];
-      }
-      text = text.replace(followUpExtraction.fullMatch, '');
+  const followUpRaw = extractAndStrip('[FOLLOW_UP:');
+  if (followUpRaw && Array.isArray(followUpRaw)) {
+      followUp = followUpRaw;
   }
-  
-  // Cleanup leftover tags
-  const tagsToRemove = [
-      /\[CHART_DATA:[\s\S]*?\]/g,
-      /\[DOMINO_DATA:[\s\S]*?\]/g,
-      /\[INSIGHT_DATA:[\s\S]*?\]/g, // Just in case regex matches leftovers
-      /\[SOURCES:[\s\S]*?\]/g,
-      /\[FOLLOW_UP:[\s\S]*?\]/g,
-      /\[BINGO_DATA:[\s\S]*?\]/g,
-      /\[THOUGHTS\][\s\S]*?\[\/THOUGHTS\]/g,
-      /\[SENTIMENT:[\s\S]*?\]/g,
-      /\[FORENSIC_DATA:[\s\S]*?\]/g
+
+  // Insight Data (with loose fallback)
+  let insightData = extractAndStrip('[INSIGHT_DATA:');
+  if (!insightData) {
+      const loose = extractLooseInsightData(text);
+      if (loose) {
+          insightData = loose.json;
+          text = text.replace(loose.fullMatch, '');
+      }
+  }
+
+  // 5. Final Cleanup: Aggressively remove any lingering tags that failed JSON parsing
+  // This prevents "[INSIGHT_DATA: ..." from showing up in the UI if the JSON was malformed.
+  const tagsToScrub = [
+      '[CHART_DATA:', '[DOMINO_DATA:', '[INSIGHT_DATA:', '[SOURCES:', 
+      '[FOLLOW_UP:', '[BINGO_DATA:', '[FORENSIC_DATA:', '[THOUGHTS]'
   ];
-
-  tagsToRemove.forEach(regex => {
-      text = text.replace(regex, '');
+  
+  tagsToScrub.forEach(tag => {
+      text = removeBlock(text, tag);
   });
+  
+  // 6. Sanitization
+  if (insightData) {
+      // Ensure arrays exist
+      ['pros', 'cons', 'stats'].forEach(k => { if (!insightData[k]) insightData[k] = []; });
+      if (!insightData.impact) insightData.impact = { beneficiaries: [], negativelyImpacted: [] };
+      if (!insightData.template) insightData.template = 'general';
+  }
 
+  // Final trim
   text = text.replace(/\n\s*\n/g, '\n\n').trim();
 
   return {
@@ -309,11 +301,13 @@ export const startChatSession = (contextArticle: Article | null, portfolio: Port
     
     2. FIRST PRINCIPLES: Extract raw data first. If you cannot find specific numbers, state "Data Unavailable".
     
-    3. SPECIALIZED TOOLS:
-       - If user asks about "Supply Chain", "Domino Effect", or "Network", generate [DOMINO_DATA].
-       - If user asks about "Lie Detector", "Tone", or "Management Credibility", use the 'forensic' template in [INSIGHT_DATA] with a focus on linguistic cues.
+    3. STRICT FORMATTING:
+       - Output ONLY valid JSON inside the specific tags.
+       - Do NOT use [object Object].
+       - Do NOT use markdown code blocks (\`\`\`json) inside the tags.
+       - Ensure all JSON arrays and objects are correctly closed.
 
-    RESPONSE JSON STRUCTURES:
+    RESPONSE STRUCTURE (Use these tags):
     
     A. [INSIGHT_DATA: {
       "template": "battle" | "valuation" | "forensic" | "general",
@@ -323,33 +317,37 @@ export const startChatSession = (contextArticle: Article | null, portfolio: Port
       
       // IF TEMPLATE = 'forensic' (Used for Lie Detector too)
       "forensic": { 
-          "score": 85, // 0-100 (100 = Honest/Safe)
+          "score": 85, 
           "status": "Clean" | "Questionable" | "Deceptive", 
           "redFlags": [{"title": "Evasive Answer", "severity": "High", "desc": "Dodged question on margins."}], 
           "auditorNote": "Tone Analysis / Auditor Name" 
       },
-      // ... (other template fields: battle, valuation, etc.)
+      // IF TEMPLATE = 'battle'
+      "battle": {
+          "winner": "TCS",
+          "loser": "Infosys",
+          "metrics": [{"label": "Revenue Growth", "winnerValue": "10%", "loserValue": "5%", "winnerFavored": true}]
+      }
+      // ... (other template fields)
     }]
 
     B. [DOMINO_DATA: {
        "nodes": [
           {"id": "1", "name": "Tata Motors", "type": "target", "sentiment": "neutral", "impactDetails": "Central Entity"},
-          {"id": "2", "name": "Tata Steel", "type": "supplier", "sentiment": "negative", "impactDetails": "Rising input costs"},
-          {"id": "3", "name": "UK Market", "type": "customer", "sentiment": "positive", "impactDetails": "Strong JLR demand"}
+          {"id": "2", "name": "Tata Steel", "type": "supplier", "sentiment": "negative", "impactDetails": "Rising input costs"}
        ],
        "edges": [
-          {"source": "2", "target": "1", "label": "Raw Materials", "impact": "negative"},
-          {"source": "1", "target": "3", "label": "Sales", "impact": "positive"}
+          {"source": "2", "target": "1", "label": "Raw Materials", "impact": "negative"}
        ]
     }]
     
     Executive Briefing:
-    (Your analysis here...)
+    (Your analysis here... Provide a clear, human-readable summary of the JSON data.)
     
-    [SOURCES: [{ "title": "...", "url": "..." }]]
-    [FOLLOW_UP: ["Q1?", "Q2?", "Q3?"]]
+    [SOURCES: [{ "title": "Source Title", "url": "https://source.url" }]]
+    [FOLLOW_UP: ["Question 1?", "Question 2?"]]
     
-    Use [THOUGHTS] for internal reasoning.
+    Use [THOUGHTS]...[/THOUGHTS] for internal reasoning steps.
     `;
 
     currentChatSession = ai.chats.create({
